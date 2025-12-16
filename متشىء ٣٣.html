@@ -1,0 +1,1805 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>منشئ الاختبارات التفاعلية والتقييم الذكي</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<script>
+// يجب تحديد مسار workerSrc للعمل مع PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.16/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<style>
+/* أنماط CSS أساسية */
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background-color: #f4f7f6; color: #333; direction: rtl; }
+.container { max-width: 900px; margin: 0 auto; background-color: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1); }
+h1, h2 { text-align: center; color: #007bff; }
+.controls, .form-section { margin-bottom: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background-color: #f9f9f9; }
+label { display: block; margin-bottom: 8px; font-weight: bold; color: #555; }
+input[type="text"], input[type="number"], textarea, select { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 1em; }
+textarea { resize: vertical; }
+button { padding: 10px 20px; margin: 5px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: background-color 0.3s, transform 0.2s; }
+button:hover { transform: translateY(-1px); }
+.primary-btn { background-color: #007bff; color: white; }
+.primary-btn:hover { background-color: #0056b3; }
+.secondary-btn { background-color: #6c757d; color: white; }
+.secondary-btn:hover { background-color: #5a6268; }
+.tab-buttons { display: flex; margin-bottom: 20px; border-bottom: 2px solid #ddd; }
+.tab { padding: 10px 15px; cursor: pointer; background-color: #f1f1f1; border: 1px solid #ddd; border-bottom: none; border-radius: 8px 8px 0 0; transition: background-color 0.3s; }
+.tab.active { background-color: #fff; border-color: #007bff; color: #007bff; font-weight: bold; border-bottom: 2px solid #fff; margin-bottom: -2px; }
+.tab-content { display: none; padding: 20px 0; border-top: 1px solid #ddd; }
+.tab-content.active { display: block; }
+.question-container { border: 1px solid #007bff66; padding: 20px; margin-bottom: 20px; border-radius: 10px; background-color: #ffffff; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05); transition: box-shadow 0.3s; }
+.question-container:hover { box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1); }
+.question-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+.question-number { font-weight: bold; color: #007bff; font-size: 1.2em; }
+.delete-btn { background-color: #dc3545; color: white; padding: 8px 12px; font-size: 0.9em; margin: 0; }
+.delete-btn:hover { background-color: #c82333; }
+.options-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.option-input { display: flex; align-items: center; gap: 10px; background: #f1f1f1; padding: 8px; border-radius: 6px; border: 1px solid #eee; transition: background 0.3s; }
+.option-input:hover { background: #e9ecef; }
+.option-input input[type="radio"] { margin-left: 10px; width: auto; flex-shrink: 0; }
+.option-input input[type="text"] { margin: 0; flex-grow: 1; }
+.option-delete-btn { background-color: #ffc107; color: #333; padding: 5px 10px; font-size: 0.8em; margin: 0; flex-shrink: 0; }
+.option-delete-btn:hover { background-color: #e0a800; }
+.hidden { display: none !important; }
+#timer { font-size: 1.5em; font-weight: bold; color: #28a745; text-align: center; padding: 10px; border: 2px solid #28a745; border-radius: 8px; margin-bottom: 20px; }
+#timer.warning { color: #ffc107; border-color: #ffc107; animation: pulse 1s infinite; }
+@keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+/* 🏆 الأنماط الخاصة بميزة تلوين الأسئلة غير المحلولة 🏆 */
+.unanswered-question { border: 3px solid #ffc107 !important; background-color: #fff9e6 !important; animation: bounce 0.5s 3; }
+@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } 100% { transform: translateY(0); } }
+/* 🏆 أنماط شاشة النتائج الجديدة - تم التعديل لتطابق الصور 🏆 */
+#resultsSection { background-color: #fff; padding: 0; box-shadow: none; }
+#resultsSection h2 { color: #007bff; text-align: center; margin-top: 0; margin-bottom: 10px; font-size: 1.8em; }
+#resultsSection h2 + p { color: #007bff; font-size: 1.5em; font-weight: bold; margin-bottom: 20px; }
+.score-summary-container { display: flex; justify-content: flex-start; align-items: stretch; gap: 15px; margin-bottom: 30px; flex-wrap: wrap; }
+.score-card { background-color: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; text-align: center; flex-basis: 30%; min-width: 150px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); display: flex; flex-direction: column; justify-content: center; }
+.score-card-primary { border-color: #007bff44; }
+.score-value { font-size: 2.5em; font-weight: bold; color: #007bff; line-height: 1.2; }
+.score-label { font-size: 0.9em; color: #555; margin-top: 5px; }
+.feedback-card { background-color: #fff; border: 1px solid #ddd; border-radius: 12px; padding: 20px; flex-basis: 30%; min-width: 150px; text-align: center; font-weight: normal; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); order: -1; border-right: 8px solid #ffc107; }
+.feedback-card .icon { font-size: 2.0em; margin-bottom: 10px; }
+.feedback-card .message { font-size: 1em; line-height: 1.5; color: #333; font-weight: bold; }
+.feedback-card .message + p { font-size: 0.8em; color: #777; margin-top: 5px; }
+.performance-chart-section { padding: 20px; margin-bottom: 30px; border-radius: 12px; background-color: #f9f9f9; border: 1px solid #ddd; }
+.performance-chart-section h3 { text-align: right; color: #dc3545; border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+.chart-bar-container { display: flex; align-items: center; margin-bottom: 10px; font-size: 0.9em; }
+.chart-label { width: 80px; text-align: right; margin-left: 10px; flex-shrink: 0; }
+.chart-bar-wrap { flex-grow: 1; height: 15px; background-color: #eee; border-radius: 4px; display: flex; overflow: hidden; position: relative; }
+.chart-bar { height: 100%; transition: width 1s ease-out; }
+.chart-value { position: absolute; right: 5px; top: 50%; transform: translateY(-50%); color: #333; font-weight: bold; font-size: 0.8em; }
+.performance-summary-table { border: 1px solid #ddd; border-radius: 12px; overflow: hidden; margin-bottom: 30px; background-color: #fff; page-break-inside: avoid; }
+.performance-summary-table h3 { background-color: #eaf6ff; color: #007bff; text-align: right; padding: 15px; margin: 0; font-size: 1.2em; }
+.performance-table { width: 100%; border-collapse: collapse; text-align: center; }
+.performance-table th, .performance-table td { border: 1px solid #eee; padding: 12px 5px; white-space: nowrap; }
+.performance-table th { background-color: #f1f1f1; color: #333; font-weight: bold; }
+.performance-table .col-total { background-color: #e8f5e9; color: #388e3c; }
+.performance-table .col-correct { background-color: #e3f2fd; color: #1976d2; }
+.performance-table .col-incorrect { background-color: #ffebee; color: #d32f2f; }
+.performance-table .col-unanswered { background-color: #fff3e0; color: #f57f17; }
+.performance-table td { font-weight: bold; }
+#detailedResults h3 { color: #007bff; text-align: right; margin-top: 30px; border-bottom: 2px solid #007bff; padding-bottom: 10px; font-size: 1.4em; }
+.result-item { border: 1px solid #ccc; padding: 15px; margin-bottom: 15px; border-radius: 8px; background-color: #fff; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); }
+.result-item.correct { border-right: 5px solid #28a745; background-color: #e6ffed; }
+.result-item.incorrect { border-right: 5px solid #dc3545; background-color: #ffe6e6; }
+.result-item.unanswered { border-right: 5px solid #ffc107; background-color: #fff9e6; }
+.result-item p strong { font-weight: bold; color: #555; }
+.status-message { padding: 8px 12px; border-radius: 6px; display: inline-block; font-weight: bold; margin-top: 5px; margin-bottom: 10px; }
+.status-message.correct { background-color: #d4edda; color: #155724; }
+.status-message.incorrect { background-color: #f8d7da; color: #721c24; }
+.status-message.unanswered { background-color: #fff3cd; color: #856404; }
+#resultsSection button { padding: 12px 25px; font-size: 1.1em; border-radius: 8px; }
+#resultsSection .secondary-btn { background-color: #6c757d; color: white; }
+.pdf-page-break { page-break-after: always; }
+@media print {
+body { background-color: white; padding: 0; margin: 0; }
+/* إخفاء واجهات العمل والتحكم */
+.container, .controls, button, .tab-buttons, #examSection, #createExamSection, #a4TestBuilder .controls, .header-controls-container, #schoolAnalysisControls, #remedialPlanContainer { display: none !important; }
+/* إظهار المحتوى المخصص للطباعة فقط */
+#a4TestBuilder:not(.hidden), #resultsSection:not(.hidden), #schoolAnalysisSection:not(.hidden), .print-only, .pdf-content-remedial-print { display: block !important; }
+#resultsSection, .print-only { padding: 0; box-shadow: none; }
+.result-item { page-break-inside: avoid; }
+#schoolAnalysisSection { border: none !important; box-shadow: none !important; background-color: white !important; padding: 0 !important; overflow: visible !important; }
+.pdf-page-break { page-break-after: always !important; }
+.performance-summary-table, #schoolAnalysisSection h4 { page-break-inside: avoid; }
+#a4TestBuilder { max-width: 210mm; margin: 0 auto; padding: 15mm; position: relative !important; z-index: 9999 !important; background-color: white !important; }
+.a4-question-container { border: 1px solid #333 !important; box-shadow: none !important; margin-bottom: 10px; padding: 10px; }
+#klisheh-section { border: 1px solid #333 !important; padding: 10px; }
+textarea { border: none; overflow: hidden; resize: none; }
+/* Ensure the Remedial Report is visible and preserves colors (FIX) */
+.pdf-content-remedial-print { display: block !important; max-width: 210mm !important; padding: 0 !important; box-shadow: none !important; }
+/* FIX: Force colors for PDF/Print */
+.report-header-banner, .report-title-box, .section-header { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color: white !important; }
+.report-header-banner { background-color: #004d40 !important; height: 120px !important; /* FIX: Fixed height for logo positioning */ }
+.report-title-box { background-color: #003631 !important; }
+.section-header.weakness { background-color: #4CAF50 !important; }
+.section-header.methods { background-color: #007bff !important; }
+.section-header.actions { background-color: #1a73e8 !important; }
+.section-header.results { background-color: #555 !important; }
+.remedial-report-container { border: none !important; background-color: white !important; }
+/* FIX: Ensure logo placement is correct for print */
+.report-logo-placeholder { position: absolute !important; right: 20px !important; top: 20px !important; width: 150px !important; height: 75px !important; display: flex !important; justify-content: center !important; align-items: center !important; background-color: transparent !important; }
+/* Ensure text in the main body is dark */
+.remedial-report-container, .remedial-report-container p, .remedial-report-container strong { color: #333 !important; }
+}
+.header-controls-container { position: relative; width: 100%; height: 0; display: flex; justify-content: flex-end; }
+.dropdown { position: absolute; top: -5px; left: 20px; display: inline-block; z-index: 1000; }
+.dropbtn { background-color: transparent; color: #333; padding: 5px; font-size: 24px; border: none; cursor: pointer; }
+.dropdown-content { display: none; position: absolute; background-color: #f9f9f9; min-width: 250px; box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2); z-index: 100; left: 0; border-radius: 8px; text-align: right; }
+.dropdown-content a { color: #333; padding: 12px 16px; text-decoration: none; display: block; transition: background-color 0.3s; }
+.dropdown-content a:hover { background-color: #007bff; color: white; }
+.dropdown:hover .dropdown-content { display: block; }
+.a4-question-container { border: 1px solid #007bff66; padding: 20px; margin-bottom: 20px; border-radius: 10px; background-color: #ffffff; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05); }
+#schoolAnalysisSection { margin-top: 40px; padding: 25px; border: 2px solid #28a745; border-radius: 12px; background-color: #e6ffe6; text-align: right; overflow: visible; }
+#schoolAnalysisSection h3 { color: #28a745; border-bottom: 2px solid #28a745; padding-bottom: 10px; margin-top: 0; text-align: center; }
+#schoolSummary { display: flex; justify-content: space-around; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; }
+.analysis-card { background-color: #fff; padding: 15px; border-radius: 8px; flex: 1 1 200px; text-align: center; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
+.analysis-card-value { font-size: 2em; font-weight: bold; color: #007bff; }
+.school-chart-container { padding: 20px; margin-bottom: 25px; border-radius: 8px; background-color: #fff; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05); }
+.chart-heading { text-align: center; color: #007bff; margin-bottom: 15px; font-size: 1.5em; border-bottom: 2px solid #eee; padding-bottom: 10px; }
+.chart-bar-wrap-full { display: flex; height: 35px; border-radius: 8px; overflow: hidden; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) inset; position: relative; }
+.chart-bar-full { height: 100%; transition: width 1s ease-out; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 0.9em; text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.3); min-width: 10%; position: relative; padding: 0 5px; }
+.chart-legend { display: flex; justify-content: center; gap: 20px; font-size: 0.9em; font-weight: bold; }
+.legend-item { display: flex; align-items: center; }
+.legend-color { width: 12px; height: 12px; border-radius: 3px; margin-left: 5px; }
+/* 🆕 الأنماط الجديدة للخطة العلاجية لواجهة المستخدم 🆕 */
+#remedialPlanContainer { margin-top: 40px; padding: 25px; border: 2px solid #007bff; border-radius: 12px; background-color: #f0f8ff; text-align: right; overflow: visible; }
+#remedialPlanContainer h3 { color: #007bff; border-bottom: 2px solid #007bff; padding-bottom: 10px; margin-top: 0; text-align: center; }
+.remedial-list { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px dashed #ccc; border-radius: 6px; margin-bottom: 15px; background-color: #ffffff; }
+.remedial-list label { font-weight: normal; display: flex; align-items: center; gap: 10px; margin-bottom: 0; cursor: pointer; }
+.remedial-list input[type="checkbox"] { width: auto; margin: 0; }
+/* ------------------------------------------------------------------- */
+/* 🆕 أنماط التقرير النهائي للخطة العلاجية (مطابقة للصورة) 🆕 */
+/* ------------------------------------------------------------------- */
+.remedial-report-container { max-width: 210mm; /* A4 width */ margin: 0 auto; padding: 0; direction: rtl; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 11pt; color: #333; background-color: #fff; /* لإخفاء الحدود الظاهرة في واجهة المستخدم فقط عند العرض */ border: none; box-shadow: none; }
+.report-header-banner { background-color: #004d40; /* Deep Teal/Green for the top banner */
+color: white; padding: 30px 20px 0 20px; /* Reduced bottom padding */
+margin-bottom: 20px; border-radius: 0 0 12px 12px; text-align: center; position: relative; overflow: hidden; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); background: linear-gradient(to right, #004d40, #14a081); height: 120px; /* FIX: Fixed height for better control */
+display: flex; flex-direction: column; justify-content: flex-end; }
+.report-header-content { /* Removed justify-content: center; */
+justify-content: flex-end; /* Align to the right in RTL */
+align-items: center; gap: 30px; width: 100%; position: absolute; /* Take it out of the normal flow */
+top: 0; right: 0; padding: 10px 20px; }
+.report-logo-placeholder { width: 150px; height: 75px; display: flex; /* FIX: Use flex */
+justify-content: center; align-items: center; font-size: 0.9em; font-weight: bold; color: #c8e6c9; background-color: transparent; /* FIX: Changed to transparent */
+border-radius: 8px; padding: 5px; position: absolute; /* FIX: Position the logo */
+right: 20px; /* FIX: Position it on the right */
+top: 20px; }
+.report-logo-placeholder img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.report-title-box { background-color: #003631; /* Even darker teal/blue */
+color: white; padding: 10px 25px; border-radius: 8px; margin: -30px auto 20px auto; /* Lifts the box into the banner area */
+width: 60%; /* FIX: Increased width */
+max-width: 400px; text-align: center; font-size: 1.3em; font-weight: bold; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); border: 1px solid #14a081; }
+.report-info-section { text-align: center; margin-bottom: 25px; line-height: 1.8; }
+.report-info-section p { margin: 5px 0; font-size: 1.1em; font-weight: 500; }
+.report-info-section strong { color: #007bff; font-weight: bold; }
+.report-section { border: 1px solid #eee; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05); overflow: hidden; page-break-inside: avoid; }
+.section-header { padding: 12px 20px; color: white; font-size: 1.2em; font-weight: bold; display: flex; justify-content: flex-end; align-items: center; }
+.section-header i { margin-left: 10px; }
+.section-header.student { background-color: #004d40; } /* Dark Teal/Green for Student */
+.section-header.weakness { background-color: #4CAF50; } /* Green */
+.section-header.methods { background-color: #007bff; } /* Blue */
+.section-header.actions { background-color: #1a73e8; } /* Darker Blue */
+.section-header.results { background-color: #555; } /* Dark Gray */
+.section-body { padding: 20px; background-color: white; font-size: 10.5pt; }
+.section-body ul { list-style-type: none; padding: 0; margin: 0; }
+.section-body ul li { margin-bottom: 8px; padding-right: 20px; position: relative; line-height: 1.6; }
+.section-body ul li::before { content: '•'; color: #4CAF50; /* Green bullet for points */
+font-size: 1.2em; position: absolute; right: 0; top: 0; }
+.section-header.methods + .section-body ul li::before { color: #007bff; }
+.section-header.actions + .section-body ul li::before { color: #1a73e8; }
+.report-signature-section { display: flex; justify-content: space-around; text-align: center; margin-top: 50px; padding-bottom: 20px; page-break-inside: avoid; }
+.report-signature-section div { width: 45%; font-weight: bold; padding-top: 10px; border-top: 1px dashed #777; color: #555; font-size: 1.1em; }
+/* حاوية الطباعة المؤقتة */
+.pdf-content-remedial-print { display: none; /* Hide the temp container */
+}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="header-controls-container">
+<div class="dropdown">
+<button class="dropbtn">...</button>
+<div id="mainDropdown" class="dropdown-content">
+<a href="#" onclick="showA4TestBuilder()">إعداد اختبار نهائي أو شهري</a>
+<a href="#" onclick="showSchoolAnalysis()">📊 تحليل أداء المدرسة/الفصول</a>
+<a href="#" onclick="showRemedialPlan()">📝 إنشاء الخطة العلاجية</a>
+</div>
+</div>
+</div>
+<div id="originalContent">
+<h1>🛠️ منشئ الاختبارات التفاعلية</h1>
+<div id="createExamSection">
+<h2>إعدادات الاختبار</h2>
+<div class="controls">
+<label for="examName">اسم الاختبار:</label>
+<input type="text" id="examName" value="الاختبار النهائي" placeholder="أدخل اسم الاختبار">
+<label for="examDuration">مدة الاختبار بالدقائق:</label>
+<input type="number" id="examDuration" value="30" min="1">
+</div>
+<h2>إعدادات التسليم والتحميل</h2>
+<div class="controls">
+<label for="submissionDays">مدة صلاحية التسليم (بالأيام):</label>
+<input type="number" id="submissionDays" value="7" min="1">
+<p id="deadlineInfo" style="font-size: 0.9em; color: #007bff;"></p>
+<hr>
+<label>تحميل الأسئلة من ملف (TXT, PDF, DOCX):</label>
+<div class="file-upload-area" onclick="document.getElementById('fileUpload').click()">
+<p>انقر أو اسحب ملفًا هنا (.txt, .pdf, .docx)</p>
+<p style="font-size: 0.9em; color: #dc3545;">🚨 **ملاحظة:** لتحديد الإجابة الصحيحة تلقائياً، استخدم إحدى العلامات التالية في **بداية** أو **نهاية** السؤال أو الخيار: `<<<صحيح>>>` أو `*` أو `**` أو `صح` أو `خطأ` أو `✅` أو `❌`.</p>
+<input type="file" id="fileUpload" accept=".txt,.pdf,.docx" onchange="handleFileUpload()" style="display: none;">
+</div>
+<hr>
+<button class="secondary-btn" onclick="saveExam()">💾 حفظ إعدادات وأسئلة الاختبار</button>
+<input type="file" id="loadExamFile" accept=".json" style="display: none;" onchange="loadSavedExam()">
+<button class="secondary-btn" onclick="document.getElementById('loadExamFile').click()">📂 تحميل إعدادات وأسئلة سابقة</button>
+</div>
+<h2>إنشاء الأسئلة وتعديلها</h2>
+<div class="controls">
+<div class="tab-buttons">
+<button class="tab active" data-tab-name="trueFalse" onclick="switchTab('trueFalse')">صواب/خطأ</button>
+<button class="tab" data-tab-name="multipleChoice" onclick="switchTab('multipleChoice')">اختيار من متعدد</button>
+</div>
+<div id="trueFalseTab" class="tab-content active">
+<button class="primary-btn" onclick="addTFQuestion()">➕ إضافة سؤال صواب/خطأ جديد</button>
+<div id="tfQuestions" style="margin-top: 20px;">
+</div>
+</div>
+<div id="multipleChoiceTab" class="tab-content">
+<button class="primary-btn" onclick="addMCQuestion()">➕ إضافة سؤال اختيار من متعدد جديد</button>
+<div id="mcQuestions" style="margin-top: 20px;">
+</div>
+</div>
+</div>
+<h2>تنفيذ الاختبار</h2>
+<div class="controls">
+<label for="studentName">الاسم الرباعي للطالب / الطالبة:</label>
+<input type="text" id="studentName" placeholder="أدخل اسم الطالب/ة الرباعي" required style="margin-bottom: 20px;">
+<label>تحديد مدى وأعداد الأسئلة المطلوب اختيارها عشوائيًا:</label>
+<div style="display: flex; gap: 20px; margin-bottom: 10px;">
+<div style="flex: 1;">
+<label for="rangeStart">بداية مدى الترقيم (مثل 20):</label>
+<input type="number" id="rangeStart" value="1" min="1" style="width: 100%; text-align: center; margin: 0;">
+</div>
+<div style="flex: 1;">
+<label for="rangeEnd">نهاية مدى الترقيم (مثل 40):</label>
+<input type="number" id="rangeEnd" value="1000" min="1" style="width: 100%; text-align: center; margin: 0;">
+</div>
+</div>
+<div style="display: flex; gap: 20px; margin-bottom: 20px;">
+<div style="flex: 1;">
+<label for="tfCountInput">صواب/خطأ (العدد المطلوب):</label>
+<div style="display: flex; align-items: center; gap: 5px;">
+<button class="secondary-btn" onclick="updateQuestionCount('tfCountInput', -1)" style="padding: 10px 15px; margin: 0;">-</button>
+<input type="number" id="tfCountInput" value="0" min="0" style="width: 100%; text-align: center; margin: 0;">
+<button class="secondary-btn" onclick="updateQuestionCount('tfCountInput', 1)" style="padding: 10px 15px; margin: 0;">+</button>
+</div>
+</div>
+<div style="flex: 1;">
+<label for="mcCountInput">اختيار من متعدد (العدد المطلوب):</label>
+<div style="display: flex; align-items: center; gap: 5px;">
+<button class="secondary-btn" onclick="updateQuestionCount('mcCountInput', -1)" style="padding: 10px 15px; margin: 0;">-</button>
+<input type="number" id="mcCountInput" value="0" min="0" style="width: 100%; text-align: center; margin: 0;">
+<button class="secondary-btn" onclick="updateQuestionCount('mcCountInput', 1)" style="padding: 10px 15px; margin: 0;">+</button>
+</div>
+</div>
+</div>
+<button class="primary-btn" style="width: 100%;" onclick="startExam()">🚀 بدء الاختبار</button>
+</div>
+</div>
+<div id="examSection" class="hidden">
+<h2 id="examTitle"></h2>
+<div id="timer">⏱️ 00:00</div>
+<div id="examQuestions">
+</div>
+<div id="shareControls" style="display: none; margin-top: 30px; padding: 20px; border: 1px solid #007bff; border-radius: 8px; background-color: #f0f8ff;">
+<p style="font-weight: bold; margin-bottom: 10px; color: #007bff;">🔗 رابط الاختبار المباشر القابل للمشاركة (يحتوي على الإجابات الصحيحة):</p>
+<div style="display: flex; gap: 10px; align-items: center;">
+<input type="text" id="examLinkInput" readonly style="flex-grow: 1; padding: 10px; border: 1px solid #007bff; border-radius: 4px; background-color: white;">
+<button id="copyLinkBtn" onclick="copyExamLink()" style="padding: 10px 18px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer;">نسخ الرابط</button>
+<button id="toggleQRBtn" onclick="toggleQRCode()" style="padding: 10px 18px; background-color: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer;">رمز QR</button>
+</div>
+<div id="qrCodeContainer" style="text-align: center; margin-top: 15px; padding: 15px; border: 1px dashed #ccc; border-radius: 4px; background-color: white; display: none;">
+<div id="qrcode"></div>
+<p style="font-size: 0.8em; color: #555; margin-top: 10px;">امسح الرمز لبدء الاختبار مباشرة.</p>
+</div>
+</div>
+<div style="text-align: center; margin-top: 30px;">
+<button class="primary-btn" onclick="submitExam(false)">✅ إنهاء وتسليم الاختبار</button>
+</div>
+</div>
+<div id="resultsSection" class="hidden">
+<div id="scoreDisplay" class="controls" style="font-size: 1.2em; text-align: center;">
+</div>
+<div id="detailedResults">
+</div>
+<div style="text-align: center; margin-top: 30px; margin-bottom: 30px;">
+<button class="primary-btn" onclick="saveResults()">💾 حفظ الدرجات بالتفصيل</button>
+<button class="primary-btn" onclick="printResults()">🖨️ طباعة النتائج</button>
+<button class="secondary-btn" onclick="resetExam()">🔄 بدء اختبار جديد</button>
+</div>
+</div>
+</div>
+<div id="schoolAnalysisContainer" class="hidden">
+<button class="secondary-btn" onclick="hideSchoolAnalysis()">العودة إلى واجهة إنشاء الاختبار</button>
+<div id="schoolAnalysisControls" class="controls" style="margin-top: 30px; border-color: #28a745;">
+<h3>📊 تحليل أداء المدرسة/الفصول (نتائج متعددة)</h3>
+<label>تحميل ملفات نتائج الطلاب (JSON):</label>
+<input type="file" id="schoolResultsUpload" accept=".json" multiple onchange="handleSchoolResultsUpload()" style="margin-bottom: 10px;">
+<button class="primary-btn" onclick="analyzeSchoolPerformance()" style="width: 100%; margin: 0 0 10px 0;">تحليل أداء المدرسة/الفصول</button>
+<div id="downloadPrintButtons" style="display: flex; gap: 10px;">
+<button class="primary-btn" style="flex-grow: 1; background-color: #dc3545;" onclick="downloadSchoolAnalysisPDF()">⬇️ تنزيل تحليل كـ PDF</button>
+<button class="secondary-btn" style="flex-grow: 1;" onclick="printSchoolAnalysis()">🖨️ طباعة التحليل</button>
+</div>
+<div id="schoolAnalysisOutput" class="hidden" style="margin-top: 20px; border-top: 1px dashed #ccc; padding-top: 15px;">
+</div>
+</div>
+</div>
+<div id="a4TestBuilder" class="hidden">
+<button class="secondary-btn" onclick="hideA4TestBuilder()">العودة إلى واجهة إنشاء الاختبار</button>
+<h2>📝 إعداد اختبار نهائي أو شهري (نموذج A4)</h2>
+<div class="controls form-section" id="klisheh-section">
+<h3>بيانات الكليشة (قابلة للتعديل بالكامل)</h3>
+<div style="display: flex; gap: 10px;">
+<input type="text" id="countryName" value="المملكة العربية السعودية" placeholder="اسم الدولة/المنطقة">
+<input type="text" id="schoolName" value="اسم المدرسة" placeholder="اسم المدرسة">
+</div>
+<div style="display: flex; gap: 10px;">
+<input type="text" id="examSubject" value="المادة" placeholder="المادة">
+<input type="text" id="examDurationA4" value="ساعة ونصف" placeholder="الزمن">
+</div>
+<div style="display: flex; gap: 10px; align-items: center;">
+<input type="number" id="totalGrade" value="40" placeholder="الدرجة الإجمالية" min="1" style="width: 150px;">
+<input type="text" id="examTitleA4" value="اختبار الفصل الدراسي الثاني للعام 1446 هـ" placeholder="عنوان الاختبار" style="flex-grow: 1;">
+</div>
+<label for="uploadLogo">تحميل/تغيير الشعار (شعار الوزارة/التعليم):</label>
+<input type="file" id="uploadLogo" accept="image/*" class="secondary-btn">
+<div id="klishehPreview" style="border: 1px dashed #007bff; padding: 15px; margin-top: 15px; text-align: center; font-size: 0.9em; background-color: #f0f8ff;">
+<p>هذه المساحة (4-5 سم) مخصصة للكليشة. جميع البيانات أعلاه ستظهر هنا في نموذج A4 النهائي.</p>
+</div>
+</div>
+<div class="controls form-section">
+<h3>إضافة الأقسام والأسئلة لنموذج A4</h3>
+<button class="primary-btn" onclick="addA4QuestionType('mcq')">➕ اختيار من متعدد / صح و خطأ</button>
+<button class="primary-btn" onclick="addA4QuestionType('essay')">➕ مقالية (عرف/علل/اشرح)</button>
+<button class="primary-btn" onclick="addA4QuestionType('matching')">➕ سؤال الاقتران</button>
+<p style="font-size: 0.9em; color: #dc3545;">ملاحظة: لإنشاء أسئلة الاختيار والاقتران، يرجى تجهيزها أولاً في واجهة **إنشاء الأسئلة وتعديلها**.</p>
+</div>
+<div id="a4QuestionsList">
+</div>
+<div class="controls form-section" style="text-align: center;">
+<h3>وظائف الإخراج</h3>
+<button class="primary-btn" onclick="saveA4Draft()">💾 حفظ مسودة العمل</button>
+<button class="primary-btn" onclick="printA4Test()">🖨️ طباعة نموذج A4</button>
+<button class="primary-btn" onclick="downloadA4Test('pdf')">⬇️ تنزيل كـ PDF</button>
+<button class="primary-btn" onclick="downloadA4Test('docx')">⬇️ تنزيل كـ DOCX</button>
+</div>
+</div>
+<div id="remedialPlanContainer" class="hidden">
+<button class="secondary-btn" onclick="hideRemedialPlan()">العودة إلى واجهة إنشاء الاختبار</button>
+<div id="remedialPlanForm" class="controls form-section" style="margin-top: 30px; border-color: #007bff;">
+<h3>📝 إنشاء الخطة العلاجية للطالب / الطالبة (نموذج التقرير المخصص)</h3>
+<label for="remedial_logo_upload">تحميل شعار الوزارة (اختياري - يظهر في التقرير):</label>
+<div style="display: flex; gap: 10px; align-items: center;">
+<input type="file" id="remedial_logo_upload" accept="image/*" style="flex-grow: 1;" onchange="handleRemedialLogoUpload()">
+<button class="secondary-btn" onclick="removeRemedialLogo()" style="background-color: #dc3545; display: inline-block;">حذف الشعار الحالي</button>
+</div>
+<hr style="margin: 20px 0;">
+<div style="display: flex; gap: 10px;">
+<input type="text" id="remedial_teacherName" placeholder="اسم المعلم / المعلمة المُعد للخطة" value="" required>
+<input type="text" id="remedial_subject" placeholder="المادة" value="" required>
+<input type="text" id="remedial_class" placeholder="الصف/الفصل" value="" required>
+</div>
+<label for="remedial_studentName">اسم الطالب / الطالبة:</label>
+<input type="text" id="remedial_studentName" placeholder="الاسم الكامل للطالب/ة" required>
+<label for="remedial_date">تاريخ إعداد الخطة:</label>
+<input type="text" id="remedial_date" readonly style="background-color: #f1f1f1;">
+<hr style="margin: 20px 0;">
+<h4>نقاط الضعف التي تم تحديدها:</h4>
+<div class="remedial-list" id="weaknessList">
+</div>
+<h4>طرق وأساليب العلاج المقترحة:</h4>
+<div class="remedial-list" id="methodsList">
+</div>
+<h4>الإجراءات العلاجية المتخذة/المقترحة:</h4>
+<div class="remedial-list" id="actionsList">
+</div>
+<hr style="margin: 20px 0;">
+<div style="display: flex; gap: 20px;">
+<div style="flex: 1;">
+<label for="remedial_improvementResult">نتيجة التحسن المتوقعة/الحالية:</label>
+<select id="remedial_improvementResult" required>
+    <option value="">-- اختر النتيجة --</option>
+</select>
+</div>
+<div style="flex: 1;">
+<label for="remedial_directorName">اسم مدير المدرسة / المديرة:</label>
+<input type="text" id="remedial_directorName" placeholder="مدير المدرسة / المديرة للتوقيع" value="مدير المدرسة / المديرة">
+</div>
+</div>
+<label for="remedial_notes">ملاحظات إضافية:</label>
+<textarea id="remedial_notes" rows="3" placeholder="أضف أي ملاحظات إضافية حول الخطة..."></textarea>
+<div style="display: flex; gap: 10px; margin-top: 20px;">
+<button class="primary-btn" style="flex-grow: 1; background-color: #009688;" onclick="printRemedialPlan()">🖨️ معاينة الصفحة (طباعة/حفظ PDF)</button>
+<button class="primary-btn" style="flex-grow: 1; background-color: #dc3545;" onclick="generateRemedialPlanPDF()">⬇️ تنزيل كـ PDF (موثوق)</button>
+</div>
+</div>
+</div>
+</div>
+<div class="pdf-content-remedial-print"></div>
+<script>
+let tfQuestionCount = 0;
+let mcQuestionCount = 0;
+let examTimer;
+let examData = { name: '', duration: 0, questions: [], submissionDeadline: null, studentName: '' };
+window.currentResults = null;
+window.schoolResults = [];
+let remedialLogoDataURL = null; // لتخزين الشعار للخطة العلاجية
+const correctTagsRegex = [
+/<<<صحيح>>>/gi,
+/\[صحيح\]/gi,
+/\*\*\*صحيح\*\*\*/gi,
+/\[صواب\]/gi,
+/\[خطأ\]/gi,
+/\*\*/g, // نجمة مزدوجة
+/\*/g, // نجمة مفردة
+/✅/g, // علامة صح يونيكود
+/❌/g, // علامة خطأ يونيكود
+/صحيح/gi,
+/صح/gi,
+/خطأ/gi,
+/غلط/gi
+];
+const allTagsPattern = new RegExp(correctTagsRegex.map(r => r.source).join('|'), 'gi');
+const MC_MAX_OPTIONS = 6;
+const MC_LETTERS = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
+// 🆕 قوائم عامة للخطة العلاجية (لجميع المواد) 🆕
+const generalRemedialLists = {
+    weaknesses: [
+        "ضعف في استيعاب المفاهيم الأساسية للمادة.",
+        "صعوبة في تطبيق القواعد النظرية على التمارين العملية.",
+        "نقص في مهارات التحليل والاستنتاج.",
+        "بطء في القراءة والفهم للنصوص التعليمية.",
+        "مشكلة في تنظيم الإجابة أو عرض الخطوات بشكل منطقي.",
+        "الارتباك وعدم القدرة على الإجابة في بيئة الاختبار.",
+        "ضعف في مهارات الحفظ والاسترجاع للمعلومات."
+    ],
+    methods: [
+        "شرح القواعد والمفاهيم بطرق مبسطة وإيضاحها بالرسوم البيانية أو الخرائط الذهنية.",
+        "تكليف الطالب بمهام محددة وسهلة التحقيق لرفع الثقة بالنفس والتعزيز الإيجابي.",
+        "استخدام الألعاب التعليمية والمحاكاة لربط المفاهيم بالواقع العملي.",
+        "توفير بيئة هادئة وداعمة أثناء المذاكرة والتدريب.",
+        "استخدام أسلوب التعلم التعاوني لمناقشة الصعوبات مع الزملاء.",
+        "تجزئة المهام الكبيرة إلى مهام صغيرة يسهل إنجازها.",
+        "التدريب على مهارات التلخيص وتنظيم المعلومات في جداول."
+    ],
+    actions: [
+        "مراجعة شاملة لأساسيات المادة للمرحلة السابقة.",
+        "توفير نماذج جاهزة لحل التمارين وتوضيح الخطوات النموذجية.",
+        "زيادة وقت التمارين والمراجعة المكثفة بمعدل مرتين أسبوعياً.",
+        "إجراء اختبارات قصيرة (Quiz) منتظمة لتقييم التقدم.",
+        "تشجيع الطالب على طرح الأسئلة وتحديد نقاط الغموض.",
+        "التنسيق مع ولي الأمر لمتابعة المهام العلاجية في المنزل.",
+        "استخدام بطاقات المراجعة (Flash Cards) للمفاهيم الرئيسية."
+    ],
+    improvementResults: [
+        "تحسن سريع وملموس",
+        "جيد جداً (تحسن مستمر)",
+        "جيد (تحسن بطيء)",
+        "بطيء / لا يوجد تحسن بعد"
+    ]
+};
+// 🆕 نهاية قوائم الخطة العلاجية العامة 🆕
+function populateRemedialLists() {
+    const lists = generalRemedialLists;
+
+    // 1. نقاط الضعف
+    const weaknessListEl = document.getElementById('weaknessList');
+    weaknessListEl.innerHTML = ''; 
+    lists.weaknesses.forEach((item, index) => {
+        weaknessListEl.innerHTML += `
+            <label>
+                <input type="checkbox" name="weakness" value="${item}">
+                ${item}
+            </label>
+        `;
+    });
+
+    // 2. طرق وأساليب العلاج
+    const methodsListEl = document.getElementById('methodsList');
+    methodsListEl.innerHTML = ''; 
+    lists.methods.forEach((item, index) => {
+        methodsListEl.innerHTML += `
+            <label>
+                <input type="checkbox" name="method" value="${item}">
+                ${item}
+            </label>
+        `;
+    });
+
+    // 3. الإجراءات العلاجية المتخذة/المقترحة
+    const actionsListEl = document.getElementById('actionsList');
+    actionsListEl.innerHTML = ''; 
+    lists.actions.forEach((item, index) => {
+        actionsListEl.innerHTML += `
+            <label>
+                <input type="checkbox" name="action" value="${item}">
+                ${item}
+            </label>
+        `;
+    });
+
+    // 4. نتيجة التحسن
+    const resultSelectEl = document.getElementById('remedial_improvementResult');
+    const selectedValue = resultSelectEl.value; 
+    resultSelectEl.innerHTML = '<option value="">-- اختر النتيجة --</option>'; 
+    lists.improvementResults.forEach((item, index) => {
+        const isSelected = item === selectedValue ? 'selected' : '';
+        resultSelectEl.innerHTML += `
+            <option value="${item}" ${isSelected}>${item}</option>
+        `;
+    });
+}
+document.addEventListener('DOMContentLoaded', populateRemedialLists);
+
+function shuffleArray(array) {
+for (let i = array.length - 1; i > 0; i--) {
+const j = Math.floor(Math.random() * (i + 1));
+[array[i], array[j]] = [array[j], array[i]];
+}
+return array;
+}
+function getFeedbackMessage(percentage) {
+if (percentage >= 90) {
+return { message: "أداء متميز! نتيجة ممتازة.", icon: "🌟" };
+} else if (percentage >= 80) {
+return { message: "جيد جداً! عمل رائع.", icon: "👏" };
+} else if (percentage >= 70) {
+return { message: "جيد. تحتاج لمراجعة خفيفة.", icon: "👍" };
+} else if (percentage >= 50) {
+return { message: "يحتاج لمزيد من المذاكرة.", icon: "📚" };
+} else {
+return { message: "نتيجة ضعيفة. يجب الدراسة بجد أكبر.", icon: "😔" };
+}
+}
+function updateDeadlineInfo() {
+const days = parseInt(document.getElementById('submissionDays').value) || 7;
+const deadline = new Date();
+deadline.setDate(deadline.getDate() + days);
+document.getElementById('deadlineInfo').innerHTML = `
+<strong>📅 الموعد النهائي للتسليم:</strong> ${deadline.toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+`;
+examData.submissionDeadline = deadline;
+}
+document.getElementById('submissionDays').addEventListener('change', updateDeadlineInfo);
+function switchTab(tabName) {
+document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+const clickedButton = event ? event.currentTarget : document.querySelector(`.tab[data-tab-name="${tabName}"]`);
+if (clickedButton) clickedButton.classList.add('active');
+document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+document.getElementById(tabName + 'Tab').classList.add('active');
+}
+function updateQuestionCount(elementId, change) {
+const inputElement = document.getElementById(elementId);
+let currentValue = parseInt(inputElement.value) || 0;
+let newValue = currentValue + change;
+if (newValue < 0) {
+newValue = 0;
+}
+inputElement.value = newValue;
+}
+function handleFileUpload() {
+const file = document.getElementById('fileUpload').files[0];
+if (!file) return;
+document.querySelector('.file-upload-area p:first-child').textContent = `✅ تم تحميل الملف: ${file.name}`;
+if (file.type === 'application/pdf') {
+loadQuestionsFromPDF(file);
+} else if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+loadQuestionsFromDOCX(file);
+} else if (file.type === 'text/plain') {
+loadQuestionsFromFile(file);
+} else {
+alert('⚠️ نوع الملف غير مدعوم. يرجى تحميل ملف .txt أو .pdf أو .docx');
+}
+}
+function loadQuestionsFromFile(file) {
+const reader = new FileReader();
+reader.onload = function (e) {
+try {
+const content = e.target.result;
+processQuestionsContent(content);
+} catch (error) {
+alert('❌ حدث خطأ أثناء قراءة الملف النصي: ' + error.message);
+}
+};
+reader.readAsText(file, 'UTF-8');
+}
+async function loadQuestionsFromPDF(file) {
+try {
+if (typeof pdfjsLib === 'undefined') {
+alert('❌ فشل تحميل مكتبة PDF.js. تأكد من تحميلها بشكل صحيح.');
+return;
+}
+const arrayBuffer = await file.arrayBuffer();
+const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+let textContent = '';
+for (let i = 1; i <= pdf.numPages; i++) {
+const page = await pdf.getPage(i);
+const text = await page.getTextContent();
+textContent += text.items.map(item => item.str).join(' ') + '\n';
+}
+if (textContent.trim().length === 0) {
+alert('الملف فارغ أو لا يحتوي على نص صالح.');
+return;
+}
+processQuestionsContent(textContent);
+} catch (error) {
+console.error(error);
+alert('❌ حدث خطأ أثناء معالجة ملف PDF: ' + error.message);
+}
+}
+async function loadQuestionsFromDOCX(file) {
+try {
+if (typeof mammoth === 'undefined') {
+alert('❌ فشل تحميل مكتبة Mammoth.js. تأكد من تحميلها بشكل صحيح.');
+return;
+}
+const arrayBuffer = await file.arrayBuffer();
+const result = await mammoth.extractRawText({ arrayBuffer: arrayBuffer });
+const textContent = result.value;
+if (textContent.trim().length === 0) {
+alert('الملف فارغ أو لا يحتوي على نص صالح.');
+return;
+}
+processQuestionsContent(textContent);
+} catch (error) {
+console.error(error);
+alert('❌ حدث خطأ أثناء معالجة ملف DOCX: ' + error.message);
+}
+}
+function processQuestionsContent(content) {
+// محاولة تقسيم المحتوى إلى أسئلة
+const lines = content.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+if (lines.length === 0) {
+alert('⚠️ لم يتم العثور على أسئلة صالحة في الملف.');
+return;
+}
+let newQuestions = [];
+let currentQuestion = null;
+let currentOptions = [];
+let questionType = null;
+let lineNumber = 0;
+// دالة مساعدة لتحديد ما إذا كان السطر يمثل خيار إجابة
+const isOption = (line) => {
+// خيارات متعددة تكون عادةً مرقمة بحرف أو رقم
+return /^[أ-و] |^\([أ-و]\) |^\d\./.test(line);
+};
+const finalizeQuestion = () => {
+if (currentQuestion) {
+const questionText = currentQuestion.replace(allTagsPattern, '').trim();
+let correctAnswer = null;
+let isTF = false;
+// تحديد نوع السؤال
+if (currentOptions.length === 0) {
+// افتراض سؤال صواب/خطأ إذا لم يكن هناك خيارات
+isTF = true;
+// البحث عن علامة "صحيح" أو "خطأ" في نص السؤال الأصلي
+const originalText = currentQuestion;
+if (/\*|\[صواب\]|صحيح|✅/i.test(originalText)) {
+correctAnswer = 'صواب';
+} else if (/\[خطأ\]|خطأ|❌/i.test(originalText)) {
+correctAnswer = 'خطأ';
+} else {
+// افتراض صواب كقيمة افتراضية لسهولة التحرير لاحقاً
+correctAnswer = 'صواب'; 
+}
+} else {
+// سؤال اختيار من متعدد
+let finalOptions = currentOptions.map(opt => opt.replace(allTagsPattern, '').trim());
+let correctIndex = -1;
+currentOptions.forEach((opt, index) => {
+if (allTagsPattern.test(opt)) {
+correctIndex = index;
+}
+});
+if (correctIndex !== -1) {
+correctAnswer = finalOptions[correctIndex];
+} else {
+// تعيين الخيار الأول كصحيح افتراضياً
+correctAnswer = finalOptions[0];
+}
+newQuestions.push({
+id: `mc-${mcQuestionCount++}`,
+type: 'mc',
+text: questionText,
+options: finalOptions,
+correctAnswer: correctAnswer
+});
+currentQuestion = null;
+currentOptions = [];
+return; // انتهينا من MC
+}
+if (isTF) {
+newQuestions.push({
+id: `tf-${tfQuestionCount++}`,
+type: 'tf',
+text: questionText,
+correctAnswer: correctAnswer // سيكون 'صواب' أو 'خطأ'
+});
+}
+currentQuestion = null;
+currentOptions = [];
+}
+};
+// المرور على السطور لتحديد الأسئلة
+for (const line of lines) {
+lineNumber++;
+if (/^\d{1,3}\./.test(line) || /^س\d{1,3}:/.test(line) || /^السؤال\s+\d{1,3}:/.test(line)) {
+// بداية سؤال جديد (مرقم)
+finalizeQuestion();
+currentQuestion = line.replace(/^\d{1,3}\./, '').replace(/^س\d{1,3}:/, '').trim();
+currentOptions = [];
+} else if (currentQuestion && (line.startsWith('(') && line.endsWith(')'))) {
+// سطر يحتوي على إشارة إلى خيارات MC (افتراضياً)
+// يمكن تجاهلها أو محاولة دمجها في السؤال
+} else if (currentQuestion && (isOption(line) || currentOptions.length > 0 && line.length < 50)) {
+// خيار لسؤال سابق (جمع الخيارات)
+currentOptions.push(line);
+} else {
+// سطر إضافي نصي (قد يكون جزءًا من السؤال)
+if (currentQuestion) {
+currentQuestion += ' ' + line;
+}
+}
+}
+finalizeQuestion(); // لمعالجة آخر سؤال
+// تحديث الواجهة
+if (newQuestions.length > 0) {
+newQuestions.forEach(q => {
+if (q.type === 'tf') {
+addTFQuestion(q.text, q.correctAnswer);
+} else if (q.type === 'mc') {
+addMCQuestion(q.text, q.options, q.correctAnswer);
+}
+});
+alert(`✅ تم تحميل وإضافة ${newQuestions.length} سؤال بنجاح!`);
+} else {
+alert('⚠️ لم يتم العثور على أسئلة صالحة في الملف. يرجى مراجعة التنسيق.');
+}
+}
+function addTFQuestion(text = '', answer = 'صواب') {
+const container = document.getElementById('tfQuestions');
+const newId = tfQuestionCount++;
+const tfQuestionHTML = `
+<div class="question-container" id="tf-q-${newId}" data-id="${newId}" data-type="tf">
+<div class="question-header">
+<span class="question-number">سؤال صواب/خطأ جديد (${newId})</span>
+<button class="delete-btn" onclick="deleteQuestion('tf-q-${newId}')">🗑️ حذف</button>
+</div>
+<label>نص السؤال:</label>
+<textarea id="tf-text-${newId}" rows="3" placeholder="اكتب نص السؤال هنا...">${text}</textarea>
+<label>الإجابة الصحيحة:</label>
+<div style="display: flex; gap: 15px;">
+<label style="font-weight: normal;"><input type="radio" name="tf-answer-${newId}" value="صواب" ${answer === 'صواب' ? 'checked' : ''}> صواب</label>
+<label style="font-weight: normal;"><input type="radio" name="tf-answer-${newId}" value="خطأ" ${answer === 'خطأ' ? 'checked' : ''}> خطأ</label>
+</div>
+</div>
+`;
+container.insertAdjacentHTML('beforeend', tfQuestionHTML);
+}
+function addMCQuestion(text = '', options = ['', '', ''], correctOption = '') {
+const container = document.getElementById('mcQuestions');
+const newId = mcQuestionCount++;
+const questionDiv = document.createElement('div');
+questionDiv.className = 'question-container';
+questionDiv.id = `mc-q-${newId}`;
+questionDiv.dataset.id = newId;
+questionDiv.dataset.type = 'mc';
+const optionsListHTML = options.map((opt, index) => {
+const isCorrect = opt === correctOption || (options.length > 0 && correctOption === '' && index === 0);
+return `
+<div class="option-input">
+<input type="radio" name="mc-answer-${newId}" value="${MC_LETTERS[index]}" ${isCorrect ? 'checked' : ''} data-option-value="${opt}">
+<input type="text" id="mc-option-${newId}-${index}" value="${opt}" placeholder="خيار ${MC_LETTERS[index]}">
+<button class="option-delete-btn" onclick="deleteMCOption('mc-q-${newId}', this)">❌ حذف الخيار</button>
+</div>
+`;
+}).join('');
+questionDiv.innerHTML = `
+<div class="question-header">
+<span class="question-number">سؤال اختيار من متعدد جديد (${newId})</span>
+<button class="delete-btn" onclick="deleteQuestion('mc-q-${newId}')">🗑️ حذف</button>
+</div>
+<label>نص السؤال:</label>
+<textarea id="mc-text-${newId}" rows="3" placeholder="اكتب نص السؤال هنا...">${text}</textarea>
+<label>الخيارات (اختر الإجابة الصحيحة بالراديو):</label>
+<div class="options-list" id="mc-options-list-${newId}">
+${optionsListHTML}
+</div>
+<button class="secondary-btn" onclick="addMCOption('mc-q-${newId}')" style="margin-top: 10px;">➕ إضافة خيار جديد</button>
+`;
+container.appendChild(questionDiv);
+// تحديث قيمة الـ data-option-value لجميع الخيارات بعد الإضافة
+questionDiv.querySelectorAll('input[type="radio"]').forEach(radio => {
+radio.dataset.optionValue = radio.nextElementSibling.value;
+});
+// إضافة مستمعي التغيير لتحديث قيمة الـ Radio Button
+questionDiv.querySelectorAll('.option-input input[type="text"]').forEach(input => {
+input.addEventListener('input', function() {
+this.previousElementSibling.dataset.optionValue = this.value;
+});
+});
+}
+function addMCOption(questionId) {
+const questionDiv = document.getElementById(questionId);
+const optionsList = questionDiv.querySelector('.options-list');
+const optionCount = optionsList.children.length;
+const questionNum = questionDiv.dataset.id;
+if (optionCount >= MC_MAX_OPTIONS) {
+alert(`⚠️ الحد الأقصى للخيارات هو ${MC_MAX_OPTIONS}.`);
+return;
+}
+const newOptionHTML = `
+<div class="option-input">
+<input type="radio" name="mc-answer-${questionNum}" value="${MC_LETTERS[optionCount]}" data-option-value="">
+<input type="text" id="mc-option-${questionNum}-${optionCount}" value="" placeholder="خيار ${MC_LETTERS[optionCount]}">
+<button class="option-delete-btn" onclick="deleteMCOption('${questionId}', this)">❌ حذف الخيار</button>
+</div>
+`;
+optionsList.insertAdjacentHTML('beforeend', newOptionHTML);
+// إضافة مستمع التغيير للخيار الجديد
+const newOptionInput = optionsList.lastElementChild.querySelector('input[type="text"]');
+newOptionInput.addEventListener('input', function() {
+this.previousElementSibling.dataset.optionValue = this.value;
+});
+}
+function deleteMCOption(questionId, button) {
+const optionInputDiv = button.closest('.option-input');
+const isChecked = optionInputDiv.querySelector('input[type="radio"]').checked;
+optionInputDiv.remove();
+const optionsList = document.getElementById(questionId).querySelector('.options-list');
+// إعادة ترقيم الخيارات وتحديث قيمة الـ value في Radio Buttons
+optionsList.querySelectorAll('.option-input').forEach((inputDiv, index) => {
+const radio = inputDiv.querySelector('input[type="radio"]');
+const textInput = inputDiv.querySelector('input[type="text"]');
+// إعادة الترقيم بناءً على ترتيب الحروف
+radio.value = MC_LETTERS[index];
+// تحديث placeholder وقيمة الـ data-option-value
+textInput.placeholder = `خيار ${MC_LETTERS[index]}`;
+textInput.id = `mc-option-${questionId.split('-')[2]}-${index}`;
+// في حالة حذف الخيار الصحيح، يتم تعيين الخيار الأول كصحيح بشكل مؤقت
+if (isChecked && index === 0) {
+radio.checked = true;
+}
+});
+// إذا تم حذف الخيار الصحيح ولم يتبق خيارات، يتم تحديد الخيار الأول الجديد كصحيح
+if (isChecked && optionsList.children.length > 0) {
+optionsList.firstElementChild.querySelector('input[type="radio"]').checked = true;
+}
+}
+function deleteQuestion(questionId) {
+if (confirm('⚠️ هل أنت متأكد من حذف هذا السؤال؟')) {
+document.getElementById(questionId).remove();
+}
+}
+function saveExam() {
+const examName = document.getElementById('examName').value.trim();
+const duration = parseInt(document.getElementById('examDuration').value);
+if (!examName || isNaN(duration) || duration <= 0) {
+alert('❌ يرجى إدخال اسم ومدة صالحة للاختبار!');
+return;
+}
+let questions = [];
+// جمع أسئلة صواب/خطأ
+document.querySelectorAll('#tfQuestions .question-container').forEach(qDiv => {
+const id = qDiv.dataset.id;
+const text = document.getElementById(`tf-text-${id}`).value.trim();
+const answer = document.querySelector(`input[name="tf-answer-${id}"]:checked`).value;
+if (text) {
+questions.push({
+id: `tf-${id}`,
+type: 'tf',
+text: text,
+correctAnswer: answer,
+answer: null // الإجابة الافتراضية للطالب
+});
+}
+});
+// جمع أسئلة اختيار من متعدد
+document.querySelectorAll('#mcQuestions .question-container').forEach(qDiv => {
+const id = qDiv.dataset.id;
+const text = document.getElementById(`mc-text-${id}`).value.trim();
+const options = Array.from(qDiv.querySelectorAll('.option-input input[type="text"]')).map(input => input.value.trim()).filter(val => val !== '');
+const correctRadio = qDiv.querySelector(`input[name="mc-answer-${id}"]:checked`);
+const correctOptionValue = correctRadio ? correctRadio.dataset.optionValue.trim() : null;
+if (text && options.length >= 2 && correctOptionValue) {
+questions.push({
+id: `mc-${id}`,
+type: 'mc',
+text: text,
+options: options,
+correctAnswer: correctOptionValue,
+answer: null
+});
+} else if (text && options.length < 2) {
+alert(`⚠️ السؤال رقم (${id}) من نوع اختيار من متعدد يحتاج على الأقل خيارين.`);
+return;
+}
+});
+if (questions.length === 0) {
+alert('❌ يجب إضافة سؤال واحد على الأقل قبل الحفظ!');
+return;
+}
+examData.name = examName;
+examData.duration = duration;
+examData.questions = questions;
+updateDeadlineInfo(); // للتأكد من تحديث الموعد النهائي
+const dataStr = JSON.stringify(examData, null, 2);
+const blob = new Blob([dataStr], { type: 'application/json' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = `${examName}_ExamData_${new Date().toISOString().slice(0, 10)}.json`;
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
+alert('✅ تم حفظ بيانات الاختبار بنجاح!');
+}
+function loadSavedExam() {
+const file = document.getElementById('loadExamFile').files[0];
+if (!file) return;
+const reader = new FileReader();
+reader.onload = function (e) {
+try {
+const loadedData = JSON.parse(e.target.result);
+if (loadedData.name && loadedData.questions) {
+examData = loadedData;
+document.getElementById('examName').value = examData.name;
+document.getElementById('examDuration').value = examData.duration;
+if (examData.submissionDeadline) {
+const now = new Date();
+const deadline = new Date(examData.submissionDeadline);
+const diffTime = Math.abs(deadline - now);
+const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+document.getElementById('submissionDays').value = diffDays;
+}
+updateDeadlineInfo();
+loadQuestionsToUI(examData.questions);
+alert(`✅ تم تحميل الاختبار "${examData.name}" بنجاح!`);
+} else {
+alert('❌ تنسيق ملف الاختبار غير صحيح.');
+}
+} catch (error) {
+alert('❌ حدث خطأ أثناء تحميل الملف: ' + error.message);
+}
+};
+reader.readAsText(file);
+}
+function loadQuestionsToUI(questions) {
+// مسح الأسئلة الحالية
+document.getElementById('tfQuestions').innerHTML = '';
+document.getElementById('mcQuestions').innerHTML = '';
+tfQuestionCount = 0;
+mcQuestionCount = 0;
+questions.forEach(q => {
+if (q.type === 'tf') {
+addTFQuestion(q.text, q.correctAnswer);
+} else if (q.type === 'mc') {
+addMCQuestion(q.text, q.options, q.correctAnswer);
+}
+});
+}
+function startExam() {
+const studentName = document.getElementById('studentName').value.trim();
+const tfCount = parseInt(document.getElementById('tfCountInput').value) || 0;
+const mcCount = parseInt(document.getElementById('mcCountInput').value) || 0;
+const rangeStart = parseInt(document.getElementById('rangeStart').value) || 1;
+const rangeEnd = parseInt(document.getElementById('rangeEnd').value) || 1000;
+if (!studentName) {
+alert('❌ يرجى إدخال اسم الطالب/ة الرباعي لبدء الاختبار!');
+return;
+}
+if (tfCount === 0 && mcCount === 0) {
+alert('❌ يرجى تحديد عدد الأسئلة المطلوب من كل نوع لبدء الاختبار!');
+return;
+}
+examData.studentName = studentName;
+// تجميع الأسئلة حسب النوع والمدى
+let availableTF = examData.questions.filter(q => q.type === 'tf' && q.id && parseInt(q.id.split('-')[1]) >= rangeStart && parseInt(q.id.split('-')[1]) <= rangeEnd);
+let availableMC = examData.questions.filter(q => q.type === 'mc' && q.id && parseInt(q.id.split('-')[1]) >= rangeStart && parseInt(q.id.split('-')[1]) <= rangeEnd);
+if (availableTF.length < tfCount || availableMC.length < mcCount) {
+alert('⚠️ عدد الأسئلة المتوفرة في المدى المحدد (بين ' + rangeStart + ' و ' + rangeEnd + ') أقل من العدد المطلوب. يرجى تعديل الإعدادات أو إضافة المزيد من الأسئلة.');
+return;
+}
+// اختيار عشوائي للأسئلة
+const selectedTF = shuffleArray(availableTF).slice(0, tfCount);
+const selectedMC = shuffleArray(availableMC).slice(0, mcCount);
+let finalQuestions = shuffleArray([...selectedTF, ...selectedMC]);
+if (finalQuestions.length === 0) {
+alert('❌ لم يتم اختيار أي أسئلة. يرجى مراجعة إعدادات العدد والمدى.');
+return;
+}
+// إعادة تعيين الإجابات
+finalQuestions = finalQuestions.map(q => ({ ...q, answer: null }));
+examData.currentExamQuestions = finalQuestions;
+document.getElementById('examTitle').textContent = `اختبار: ${examData.name} للطالب/ة: ${studentName}`;
+// عرض شاشة الاختبار وإخفاء الأقسام الأخرى
+document.getElementById('createExamSection').classList.add('hidden');
+document.getElementById('a4TestBuilder').classList.add('hidden');
+document.getElementById('schoolAnalysisContainer').classList.add('hidden');
+document.getElementById('remedialPlanContainer').classList.add('hidden');
+document.getElementById('originalContent').classList.remove('hidden');
+document.getElementById('examSection').classList.remove('hidden');
+// عرض الأسئلة
+renderExamQuestions(examData.currentExamQuestions);
+// بدء المؤقت
+startTimer(examData.duration);
+// إخفاء رابط المشاركة بعد البدء
+document.getElementById('shareControls').style.display = 'none';
+}
+function renderExamQuestions(questions) {
+const examQuestionsDiv = document.getElementById('examQuestions');
+examQuestionsDiv.innerHTML = '';
+questions.forEach((q, index) => {
+const questionNum = index + 1;
+let questionHTML = '';
+if (q.type === 'tf') {
+questionHTML = `
+<div class="question-container" id="exam-q-${q.id}">
+<div class="question-header">
+<span class="question-number">السؤال رقم ${questionNum} (صواب/خطأ):</span>
+</div>
+<p>${q.text}</p>
+<div style="display: flex; gap: 20px;">
+<label style="font-weight: normal;"><input type="radio" name="student-answer-${q.id}" value="صواب"> صواب</label>
+<label style="font-weight: normal;"><input type="radio" name="student-answer-${q.id}" value="خطأ"> خطأ</label>
+</div>
+</div>
+`;
+} else if (q.type === 'mc') {
+const optionsHTML = q.options.map((opt, optIndex) => `
+<label style="font-weight: normal;">
+<input type="radio" name="student-answer-${q.id}" value="${opt}">
+${MC_LETTERS[optIndex]}. ${opt}
+</label>
+`).join('');
+questionHTML = `
+<div class="question-container" id="exam-q-${q.id}">
+<div class="question-header">
+<span class="question-number">السؤال رقم ${questionNum} (اختيار من متعدد):</span>
+</div>
+<p>${q.text}</p>
+<div class="options-list">
+${optionsHTML}
+</div>
+</div>
+`;
+}
+examQuestionsDiv.insertAdjacentHTML('beforeend', questionHTML);
+});
+}
+function startTimer(duration) {
+let timeRemaining = duration * 60; // بالثواني
+const timerEl = document.getElementById('timer');
+timerEl.classList.remove('warning');
+clearInterval(examTimer);
+const formatTime = (seconds) => {
+const min = String(Math.floor(seconds / 60)).padStart(2, '0');
+const sec = String(seconds % 60).padStart(2, '0');
+return `${min}:${sec}`;
+};
+examTimer = setInterval(() => {
+timeRemaining--;
+timerEl.textContent = `⏱️ ${formatTime(timeRemaining)}`;
+if (timeRemaining <= 60) {
+timerEl.classList.add('warning');
+}
+if (timeRemaining <= 0) {
+clearInterval(examTimer);
+submitExam(true); // تسليم إجباري
+}
+}, 1000);
+}
+function submitExam(isAutoSubmit) {
+clearInterval(examTimer);
+if (!isAutoSubmit && !confirm('هل أنت متأكد من إنهاء وتسليم الاختبار؟ لن تتمكن من التعديل بعد ذلك.')) {
+startTimer(Math.floor(parseInt(document.getElementById('timer').textContent.split(' ')[1].split(':')[0]) * 60 + parseInt(document.getElementById('timer').textContent.split(':')[1])));
+return;
+}
+const results = {
+studentName: examData.studentName,
+examName: examData.name,
+totalQuestions: examData.currentExamQuestions.length,
+correctCount: 0,
+incorrectCount: 0,
+unansweredCount: 0,
+score: 0,
+questions: [],
+unansweredQuestions: []
+};
+// جمع الإجابات والنتائج
+examData.currentExamQuestions.forEach((q, index) => {
+const questionNum = index + 1;
+const selectedRadio = document.querySelector(`input[name="student-answer-${q.id}"]:checked`);
+const studentAnswer = selectedRadio ? selectedRadio.value.trim() : null;
+const isCorrect = studentAnswer === q.correctAnswer;
+if (studentAnswer === null) {
+results.unansweredCount++;
+results.unansweredQuestions.push(questionNum);
+} else if (isCorrect) {
+results.correctCount++;
+results.score++;
+} else {
+results.incorrectCount++;
+}
+results.questions.push({
+...q,
+questionNum: questionNum,
+studentAnswer: studentAnswer,
+isCorrect: isCorrect
+});
+});
+results.percentage = (results.score / results.totalQuestions) * 100;
+window.currentResults = results;
+displayResults(results, isAutoSubmit);
+// إخفاء شاشة الاختبار وعرض النتائج
+document.getElementById('examSection').classList.add('hidden');
+document.getElementById('resultsSection').classList.remove('hidden');
+}
+function displayResults(results, isAutoSubmit) {
+const scoreDisplayEl = document.getElementById('scoreDisplay');
+const detailedResultsEl = document.getElementById('detailedResults');
+const feedback = getFeedbackMessage(results.percentage);
+// 1. عرض ملخص النتيجة
+scoreDisplayEl.innerHTML = `
+<h2>نتائج الاختبار (${results.examName})</h2>
+<p>${results.studentName}</p>
+<div class="score-summary-container">
+<div class="score-card feedback-card">
+<div class="icon">${feedback.icon}</div>
+<div class="message">${feedback.message}</div>
+<p>${isAutoSubmit ? '⚠️ تم التسليم تلقائياً بسبب انتهاء الوقت.' : ''}</p>
+</div>
+<div class="score-card score-card-primary">
+<div class="score-value">${results.score} / ${results.totalQuestions}</div>
+<div class="score-label">النتيجة الإجمالية (الدرجات)</div>
+</div>
+<div class="score-card" style="border-right: 8px solid #007bff;">
+<div class="score-value">${results.percentage.toFixed(1)}%</div>
+<div class="score-label">النسبة المئوية</div>
+</div>
+</div>
+<div class="performance-summary-table">
+<h3>ملخص أداء الطالب على الاختبار</h3>
+<table class="performance-table">
+<thead>
+<tr>
+<th>إجمالي الأسئلة</th>
+<th class="col-correct">صحيح</th>
+<th class="col-incorrect">خطأ</th>
+<th class="col-unanswered">لم تتم الإجابة</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="col-total">${results.totalQuestions}</td>
+<td class="col-correct">${results.correctCount}</td>
+<td class="col-incorrect">${results.incorrectCount}</td>
+<td class="col-unanswered">${results.unansweredCount}</td>
+</tr>
+</tbody>
+</table>
+</div>
+`;
+// 2. عرض النتائج التفصيلية
+detailedResultsEl.innerHTML = `<h3>الإجابات التفصيلية ونقاط الضعف:</h3>`;
+results.questions.forEach(q => {
+const statusClass = q.studentAnswer === null ? 'unanswered' : (q.isCorrect ? 'correct' : 'incorrect');
+const statusText = q.studentAnswer === null ? 'لم تتم الإجابة' : (q.isCorrect ? 'صحيحة' : 'خاطئة');
+const statusMsgClass = statusClass.replace('unanswered', 'unanswered'); // لتوحيد الألوان
+const detailedItem = `
+<div class="result-item ${statusClass}">
+<p><strong>السؤال رقم ${q.questionNum}:</strong> ${q.text}</p>
+<div class="status-message ${statusMsgClass}">
+الحالة: ${statusText}
+</div>
+<p>
+<strong>إجابة الطالب:</strong> ${q.studentAnswer !== null ? q.studentAnswer : '-'}
+<br>
+<strong>الإجابة الصحيحة:</strong> ${q.correctAnswer}
+</p>
+${statusClass === 'incorrect' ? '<p style="font-size: 0.9em; color: #dc3545; font-weight: bold;">🚨 نقطة ضعف محتملة: مراجعة المفهوم.</p>' : ''}
+</div>
+`;
+detailedResultsEl.insertAdjacentHTML('beforeend', detailedItem);
+});
+}
+function saveResults() {
+if (!window.currentResults) {
+alert('❌ لا توجد نتائج لحفظها!');
+return;
+}
+const dataStr = JSON.stringify(window.currentResults, null, 2);
+const blob = new Blob([dataStr], { type: 'application/json' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = `${window.currentResults.examName}_Result_${window.currentResults.studentName}_${new Date().toISOString().slice(0, 10)}.json`;
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+URL.revokeObjectURL(url);
+alert('✅ تم حفظ النتائج بالتفصيل!');
+}
+function printResults() {
+if (!window.currentResults) {
+alert('❌ لا توجد نتائج للطباعة!');
+return;
+}
+// إخفاء الأزرار قبل الطباعة
+document.querySelectorAll('#resultsSection button').forEach(btn => btn.style.display = 'none');
+window.print();
+// إعادة إظهار الأزرار بعد الطباعة (أو إلغائها)
+document.querySelectorAll('#resultsSection button').forEach(btn => btn.style.display = 'inline-block');
+}
+function resetExam() {
+document.getElementById('examName').value = 'الاختبار النهائي';
+document.getElementById('examDuration').value = '30';
+document.getElementById('tfCountInput').value = '0';
+document.getElementById('mcCountInput').value = '0';
+document.getElementById('studentName').value = '';
+document.getElementById('tfQuestions').innerHTML = '';
+document.getElementById('mcQuestions').innerHTML = '';
+tfQuestionCount = 0;
+mcQuestionCount = 0;
+examData = { name: '', duration: 0, questions: [], submissionDeadline: null, studentName: '' };
+window.currentResults = null;
+document.getElementById('resultsSection').classList.add('hidden');
+document.getElementById('examSection').classList.add('hidden');
+document.getElementById('createExamSection').classList.remove('hidden');
+updateDeadlineInfo();
+}
+// ----------------------------------------------------
+// الدوال الخاصة بالقائمة المنسدلة (Dropdown)
+// ----------------------------------------------------
+function showA4TestBuilder() {
+// إخفاء الأقسام الأخرى
+document.getElementById('originalContent').classList.add('hidden');
+document.getElementById('schoolAnalysisContainer').classList.add('hidden');
+document.getElementById('remedialPlanContainer').classList.add('hidden');
+// عرض قسم A4 Builder
+document.getElementById('a4TestBuilder').classList.remove('hidden');
+}
+function hideA4TestBuilder() {
+document.getElementById('a4TestBuilder').classList.add('hidden');
+document.getElementById('originalContent').classList.remove('hidden');
+}
+function showSchoolAnalysis() {
+document.getElementById('originalContent').classList.add('hidden');
+document.getElementById('a4TestBuilder').classList.add('hidden');
+document.getElementById('remedialPlanContainer').classList.add('hidden');
+document.getElementById('schoolAnalysisContainer').classList.remove('hidden');
+}
+function hideSchoolAnalysis() {
+document.getElementById('schoolAnalysisContainer').classList.add('hidden');
+document.getElementById('originalContent').classList.remove('hidden');
+}
+function showRemedialPlan() {
+document.getElementById('originalContent').classList.add('hidden');
+document.getElementById('a4TestBuilder').classList.add('hidden');
+document.getElementById('schoolAnalysisContainer').classList.add('hidden');
+document.getElementById('remedialPlanContainer').classList.remove('hidden');
+// تعيين التاريخ الحالي
+document.getElementById('remedial_date').value = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+populateRemedialLists(); // ملء القوائم العامة عند الفتح
+}
+function hideRemedialPlan() {
+document.getElementById('remedialPlanContainer').classList.add('hidden');
+document.getElementById('originalContent').classList.remove('hidden');
+}
+// ----------------------------------------------------
+// دوال الخطة العلاجية (Remedial Plan)
+// ----------------------------------------------------
+function handleRemedialLogoUpload() {
+const file = document.getElementById('remedial_logo_upload').files[0];
+if (!file) return;
+const reader = new FileReader();
+reader.onload = function (e) {
+remedialLogoDataURL = e.target.result;
+// يمكن وضع مؤشر بصري هنا
+document.querySelector('#remedialPlanForm button[onclick="removeRemedialLogo()"]').style.display = 'inline-block';
+document.querySelector('#remedialPlanForm input[type="file"]').style.backgroundColor = '#d4edda';
+};
+reader.readAsDataURL(file);
+}
+function removeRemedialLogo() {
+remedialLogoDataURL = null;
+document.getElementById('remedial_logo_upload').value = '';
+document.querySelector('#remedialPlanForm button[onclick="removeRemedialLogo()"]').style.display = 'none';
+document.querySelector('#remedialPlanForm input[type="file"]').style.backgroundColor = 'white';
+}
+function getRemedialPlanData() {
+const studentName = document.getElementById('remedial_studentName').value.trim();
+const teacherName = document.getElementById('remedial_teacherName').value.trim();
+const subject = document.getElementById('remedial_subject').value.trim();
+const className = document.getElementById('remedial_class').value.trim();
+const date = document.getElementById('remedial_date').value;
+const directorName = document.getElementById('remedial_directorName').value.trim();
+const notes = document.getElementById('remedial_notes').value.trim();
+const improvementResult = document.getElementById('remedial_improvementResult').value;
+// التحقق من الحقول الإلزامية
+if (!studentName || !teacherName || !subject || !className || !improvementResult) {
+alert('❌ يرجى ملء جميع الحقول المطلوبة (اسم الطالب/ة، نتيجة التحسن، اسم المعلم/ة، المادة، والصف) قبل التنزيل/الطباعة.');
+return null;
+}
+const getCheckedItems = (listId) => {
+return Array.from(document.getElementById(listId).querySelectorAll('input[type="checkbox"]:checked'))
+.map(input => input.value);
+};
+return {
+studentName,
+teacherName,
+subject,
+className,
+date,
+directorName,
+notes,
+improvementResult,
+weaknesses: getCheckedItems('weaknessList'),
+methods: getCheckedItems('methodsList'),
+actions: getCheckedItems('actionsList'),
+logoDataURL: remedialLogoDataURL
+};
+}
+function generateRemedialPlanHTML(data) {
+if (!data) return '';
+const logoHTML = data.logoDataURL ? `<img src="${data.logoDataURL}" alt="شعار الوزارة">` : `شعار الوزارة`;
+const weaknessList = data.weaknesses.map(item => `<li>${item}</li>`).join('');
+const methodsList = data.methods.map(item => `<li>${item}</li>`).join('');
+const actionsList = data.actions.map(item => `<li>${item}</li>`).join('');
+const notesHTML = data.notes ? `<div class="report-section"><div class="section-header section-header-results"><i class="fas fa-file-alt"></i> ملاحظات إضافية</div><div class="section-body"><p>${data.notes}</p></div></div>` : '';
+return `
+<div class="remedial-report-container" id="remedialPlanReportContent">
+<div class="report-header-banner">
+<div class="report-logo-placeholder">${logoHTML}</div>
+<div class="report-header-content">
+</div>
+</div>
+<div class="report-title-box">
+تقرير الخطة العلاجية الفردية
+</div>
+<div class="report-info-section">
+<p><strong>اسم الطالب/ة:</strong> ${data.studentName}</p>
+<p><strong>المادة:</strong> ${data.subject} | <strong>الصف:</strong> ${data.className}</p>
+<p><strong>اسم المعلم/ة:</strong> ${data.teacherName} | <strong>تاريخ الإعداد:</strong> ${data.date}</p>
+</div>
+<div class="report-section">
+<div class="section-header section-header weakness"><i class="fas fa-exclamation-triangle"></i> نقاط الضعف التي تم تحديدها</div>
+<div class="section-body">
+${data.weaknesses.length > 0 ? `<ul>${weaknessList}</ul>` : '<p>لا توجد نقاط ضعف محددة.</p>'}
+</div>
+</div>
+<div class="report-section">
+<div class="section-header section-header methods"><i class="fas fa-tools"></i> طرق وأساليب العلاج المقترحة</div>
+<div class="section-body">
+${data.methods.length > 0 ? `<ul>${methodsList}</ul>` : '<p>لا توجد طرق علاج مقترحة.</p>'}
+</div>
+</div>
+<div class="report-section">
+<div class="section-header section-header actions"><i class="fas fa-tasks"></i> الإجراءات العلاجية المتخذة/المقترحة</div>
+<div class="section-body">
+${data.actions.length > 0 ? `<ul>${actionsList}</ul>` : '<p>لا توجد إجراءات علاجية مقترحة.</p>'}
+</div>
+</div>
+<div class="report-section">
+<div class="section-header section-header results"><i class="fas fa-chart-line"></i> نتيجة التحسن المتوقعة/الحالية</div>
+<div class="section-body">
+<p style="font-size: 1.1em; font-weight: bold; color: #007bff;">${data.improvementResult}</p>
+</div>
+</div>
+${notesHTML}
+<div class="report-signature-section">
+<div>توقيع المعلم / المعلمة:</div>
+<div>توقيع مدير المدرسة / المديرة: ${data.directorName}</div>
+</div>
+</div>
+`;
+}
+function printRemedialPlan() {
+const data = getRemedialPlanData();
+if (!data) return;
+const printContainer = document.querySelector('.pdf-content-remedial-print');
+printContainer.innerHTML = generateRemedialPlanHTML(data);
+printContainer.style.display = 'block'; // Ensure it's visible for printing
+// Hide main app content
+document.getElementById('remedialPlanContainer').classList.add('hidden');
+// Use the browser's native print dialog
+setTimeout(() => {
+window.print();
+// Restore visibility
+document.getElementById('remedialPlanContainer').classList.remove('hidden');
+printContainer.innerHTML = '';
+printContainer.style.display = 'none';
+}, 100);
+}
+function generateRemedialPlanPDF() {
+const data = getRemedialPlanData();
+if (!data) return;
+const element = document.createElement('div');
+element.innerHTML = generateRemedialPlanHTML(data);
+// إخفاء الـ PDF content container في الواجهة ولكن استخدامه لإنشاء PDF
+const filename = `الخطة_العلاجية_${data.studentName.split(' ')[0]}_${data.subject}.pdf`;
+html2pdf().from(element).set({
+margin: [10, 10, 10, 10], // top, left, bottom, right
+filename: filename,
+image: { type: 'jpeg', quality: 0.98 },
+html2canvas: { scale: 2, logging: true, dpi: 192, letterRendering: true },
+jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+pagebreak: { before: '.pdf-page-break' }
+}).save();
+}
+// ----------------------------------------------------
+// دوال تحليل أداء المدرسة (School Analysis)
+// ----------------------------------------------------
+function handleSchoolResultsUpload() {
+const files = document.getElementById('schoolResultsUpload').files;
+if (files.length === 0) return;
+window.schoolResults = []; // تفريغ النتائج السابقة
+let filesProcessed = 0;
+const totalFiles = files.length;
+const reader = new FileReader();
+const processNextFile = () => {
+if (filesProcessed < totalFiles) {
+const file = files[filesProcessed];
+reader.onload = function (e) {
+try {
+const result = JSON.parse(e.target.result);
+if (result.studentName && result.examName && result.totalQuestions) {
+window.schoolResults.push(result);
+} else {
+console.warn(`ملف غير صالح: ${file.name}`);
+}
+} catch (error) {
+console.error(`خطأ في قراءة ملف JSON: ${file.name}`, error);
+}
+filesProcessed++;
+processNextFile();
+};
+reader.readAsText(file);
+} else {
+alert(`✅ تم تحميل ${window.schoolResults.length} نتيجة صالحة من ${totalFiles} ملف.`);
+document.getElementById('schoolAnalysisControls').style.border = '2px solid #28a745'; // تأكيد النجاح
+}
+};
+processNextFile();
+}
+function analyzeSchoolPerformance() {
+if (window.schoolResults.length === 0) {
+alert('❌ يرجى تحميل ملفات نتائج الطلاب أولاً!');
+return;
+}
+const analysisOutput = document.getElementById('schoolAnalysisOutput');
+analysisOutput.innerHTML = '';
+analysisOutput.classList.remove('hidden');
+const totalStudents = window.schoolResults.length;
+const totalQuestions = window.schoolResults.length > 0 ? window.schoolResults[0].totalQuestions : 0;
+if (totalQuestions === 0) {
+analysisOutput.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ لا يمكن إجراء التحليل. عدد الأسئلة غير محدد أو غير متطابق بين الملفات.</p>';
+return;
+}
+let totalCorrect = 0;
+let totalIncorrect = 0;
+let totalUnanswered = 0;
+let questionStats = new Array(totalQuestions).fill(0).map(() => ({ correct: 0, incorrect: 0, unanswered: 0 }));
+// تجميع الإحصائيات العامة والخاصة بكل سؤال
+window.schoolResults.forEach(result => {
+totalCorrect += result.correctCount;
+totalIncorrect += result.incorrectCount;
+totalUnanswered += result.unansweredCount;
+result.questions.forEach((q, index) => {
+if (index < totalQuestions) {
+if (q.isCorrect) {
+questionStats[index].correct++;
+} else if (q.studentAnswer === null) {
+questionStats[index].unanswered++;
+} else {
+questionStats[index].incorrect++;
+}
+}
+});
+});
+const overallCorrectPercentage = (totalCorrect / (totalStudents * totalQuestions)) * 100;
+const overallIncorrectPercentage = (totalIncorrect / (totalStudents * totalQuestions)) * 100;
+const overallUnansweredPercentage = (totalUnanswered / (totalStudents * totalQuestions)) * 100;
+// بناء مخرجات التحليل
+analysisOutput.insertAdjacentHTML('beforeend', `
+<div id="schoolAnalysisSection">
+<h3>📊 تقرير تحليل أداء المدرسة/الفصول 📊</h3>
+<h4>ملخص الأداء العام:</h4>
+<div id="schoolSummary">
+<div class="analysis-card" style="border-right: 5px solid #007bff;">
+<div class="analysis-card-value">${totalStudents}</div>
+<div class="score-label">إجمالي عدد الطلاب (نتائج)</div>
+</div>
+<div class="analysis-card" style="border-right: 5px solid #28a745;">
+<div class="analysis-card-value">${overallCorrectPercentage.toFixed(1)}%</div>
+<div class="score-label">متوسط نسبة الإجابة الصحيحة</div>
+</div>
+<div class="analysis-card" style="border-right: 5px solid #dc3545;">
+<div class="analysis-card-value">${overallIncorrectPercentage.toFixed(1)}%</div>
+<div class="score-label">متوسط نسبة الإجابة الخاطئة</div>
+</div>
+<div class="analysis-card" style="border-right: 5px solid #ffc107;">
+<div class="analysis-card-value">${overallUnansweredPercentage.toFixed(1)}%</div>
+<div class="score-label">متوسط نسبة عدم الإجابة</div>
+</div>
+</div>
+<h4>توزيع الأداء العام:</h4>
+<div class="school-chart-container">
+<div class="chart-bar-wrap-full">
+<div class="chart-bar-full" style="width: ${overallCorrectPercentage}%; background-color: #28a745;">
+${overallCorrectPercentage.toFixed(1)}% صحيح
+</div>
+<div class="chart-bar-full" style="width: ${overallIncorrectPercentage}%; background-color: #dc3545;">
+${overallIncorrectPercentage.toFixed(1)}% خطأ
+</div>
+<div class="chart-bar-full" style="width: ${overallUnansweredPercentage}%; background-color: #ffc107;">
+${overallUnansweredPercentage.toFixed(1)}% لم يجب
+</div>
+</div>
+<div class="chart-legend">
+<div class="legend-item"><span class="legend-color" style="background-color: #28a745;"></span>صحيح</div>
+<div class="legend-item"><span class="legend-color" style="background-color: #dc3545;"></span>خطأ</div>
+<div class="legend-item"><span class="legend-color" style="background-color: #ffc107;"></span>لم يجب</div>
+</div>
+</div>
+<h4>تحليل أداء الأسئلة التفصيلي (للكشف عن نقاط الضعف الجماعية):</h4>
+<div class="performance-summary-table" style="page-break-after: always;">
+<table class="performance-table">
+<thead>
+<tr>
+<th>السؤال رقم</th>
+<th class="col-total">نص السؤال</th>
+<th>عدد الطلاب</th>
+<th class="col-correct">صحيح (نسبة)</th>
+<th class="col-incorrect">خطأ (نسبة)</th>
+<th class="col-unanswered">لم يجب (نسبة)</th>
+</tr>
+</thead>
+<tbody>
+${questionStats.map((stat, index) => {
+const q = window.schoolResults[0].questions.find(item => item.questionNum === index + 1);
+const correctPct = (stat.correct / totalStudents) * 100;
+const incorrectPct = (stat.incorrect / totalStudents) * 100;
+const unansweredPct = (stat.unanswered / totalStudents) * 100;
+const isWeakness = incorrectPct >= 50 || unansweredPct >= 30; // افتراض نقطة ضعف
+return `
+<tr style="${isWeakness ? 'background-color: #f8d7da;' : ''}">
+<td>${index + 1}</td>
+<td style="max-width: 200px; white-space: normal; text-align: right; font-weight: normal;">${q ? q.text.substring(0, 100) + (q.text.length > 100 ? '...' : '') : 'N/A'}</td>
+<td>${totalStudents}</td>
+<td class="col-correct">${stat.correct} (${correctPct.toFixed(1)}%)</td>
+<td class="col-incorrect">${stat.incorrect} (${incorrectPct.toFixed(1)}%)</td>
+<td class="col-unanswered">${stat.unanswered} (${unansweredPct.toFixed(1)}%)</td>
+</tr>
+`;
+}).join('')}
+</tbody>
+</table>
+</div>
+</div>
+`);
+}
+function downloadSchoolAnalysisPDF() {
+const element = document.getElementById('schoolAnalysisSection');
+if (!element || element.innerHTML.trim() === '') {
+alert('❌ يرجى إجراء التحليل أولاً.');
+return;
+}
+const filename = `تحليل_أداء_المدرسة_${new Date().toISOString().slice(0, 10)}.pdf`;
+html2pdf().from(element).set({
+margin: [15, 10, 15, 10], // top, left, bottom, right
+filename: filename,
+image: { type: 'jpeg', quality: 0.98 },
+html2canvas: { scale: 2, logging: true, dpi: 192, letterRendering: true },
+jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+pagebreak: { mode: 'css' } // استخدم الفواصل المعرفة بـ CSS
+}).save();
+}
+function printSchoolAnalysis() {
+const element = document.getElementById('schoolAnalysisSection');
+if (!element || element.innerHTML.trim() === '') {
+alert('❌ يرجى إجراء التحليل أولاً.');
+return;
+}
+// إخفاء الأقسام الأخرى وإظهار قسم التحليل للطباعة
+document.getElementById('originalContent').classList.add('hidden');
+document.getElementById('a4TestBuilder').classList.add('hidden');
+document.getElementById('remedialPlanContainer').classList.add('hidden');
+document.getElementById('schoolAnalysisContainer').classList.remove('hidden');
+// استخدام وظيفة الطباعة
+window.print();
+// إعادة إظهار الأقسام بعد الطباعة
+document.getElementById('schoolAnalysisContainer').classList.add('hidden');
+document.getElementById('originalContent').classList.remove('hidden');
+}
+// ----------------------------------------------------
+// دوال إعداد نموذج A4 (Test Builder)
+// ----------------------------------------------------
+let a4QuestionCounter = 0;
+function addA4QuestionType(type) {
+const list = document.getElementById('a4QuestionsList');
+const qId = a4QuestionCounter++;
+let title = '';
+let contentHTML = '';
+if (type === 'mcq') {
+title = `السؤال ${qId + 1}: أسئلة اختيار من متعدد و صواب/خطأ`;
+contentHTML = `
+<p>
+**ملاحظة للمصمم:** يمكنك هنا وضع الأسئلة التي قمت بإعدادها مسبقاً في قسم إنشاء الأسئلة، أو كتابتها مباشرة.
+</p>
+<textarea rows="5" placeholder="اكتب أسئلة الاختيار من متعدد والصواب والخطأ بالخيارات هنا. يمكنك لصقها من قسم إنشاء الأسئلة بعد حفظها."></textarea>
+`;
+} else if (type === 'essay') {
+title = `السؤال ${qId + 1}: أسئلة مقالية (علل/عرف/اشرح...)`;
+contentHTML = `
+<textarea rows="8" placeholder="اكتب السؤال المقالي كاملاً هنا، واترك مساحة للإجابة." style="width: 100%;"></textarea>
+<p style="font-size: 0.8em; color: #555;">(هذا سيظهر كمنطقة لكتابة الإجابة في نموذج الطباعة)</p>
+`;
+} else if (type === 'matching') {
+title = `السؤال ${qId + 1}: أسئلة الاقتران / التوصيل`;
+contentHTML = `
+<textarea rows="8" placeholder="اكتب العمود الأول (أ) والعمود الثاني (ب) بالترتيب مع التباعد المناسب." style="width: 100%;"></textarea>
+<p style="font-size: 0.8em; color: #555;">(ستظهر الأقسام بجانب بعضها)</p>
+`;
+}
+const qHTML = `
+<div class="a4-question-container" id="a4-q-${qId}" data-type="${type}">
+<div class="question-header">
+<span class="question-number">${title}</span>
+<button class="delete-btn" onclick="deleteQuestion('a4-q-${qId}')">🗑️ حذف القسم</button>
+</div>
+${contentHTML}
+</div>
+`;
+list.insertAdjacentHTML('beforeend', qHTML);
+}
+function generateA4TestHTML() {
+const countryName = document.getElementById('countryName').value.trim();
+const schoolName = document.getElementById('schoolName').value.trim();
+const examSubject = document.getElementById('examSubject').value.trim();
+const examDurationA4 = document.getElementById('examDurationA4').value.trim();
+const totalGrade = document.getElementById('totalGrade').value.trim();
+const examTitleA4 = document.getElementById('examTitleA4').value.trim();
+let logoSrc = '';
+// استخدم نفس شعار الخطة العلاجية إذا كان موجودًا
+if (remedialLogoDataURL) {
+logoSrc = `<img src="${remedialLogoDataURL}" style="max-width: 100%; max-height: 100px; object-fit: contain;">`;
+}
+const klishehHTML = `
+<div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px;">
+<div style="width: 30%; text-align: right; line-height: 1.5; font-size: 10pt;">
+<strong>${countryName}</strong><br>
+<strong>${schoolName}</strong>
+</div>
+<div style="width: 40%; text-align: center;">
+${logoSrc || '<span>شعار</span>'}
+</div>
+<div style="width: 30%; text-align: left; line-height: 1.5; font-size: 10pt;">
+<strong>المادة:</strong> ${examSubject}<br>
+<strong>الزمن:</strong> ${examDurationA4}<br>
+<strong>الدرجة:</strong> ${totalGrade}
+</div>
+</div>
+<h2 style="text-align: center; color: #333; border-bottom: 2px solid #333; padding-bottom: 10px; margin-top: 0; font-size: 1.5em;">${examTitleA4}</h2>
+<div style="display: flex; justify-content: space-around; text-align: center; border: 1px solid #333; padding: 10px; margin-bottom: 20px;">
+<div style="width: 30%; border-left: 1px solid #333;"><strong>اسم الطالب:</strong> </div>
+<div style="width: 30%; border-left: 1px solid #333;"><strong>الصف:</strong> </div>
+<div style="width: 30%;"><strong>الرقم الأكاديمي:</strong> </div>
+</div>
+`;
+let questionsHTML = '';
+document.querySelectorAll('#a4QuestionsList .a4-question-container').forEach((qDiv, index) => {
+const qType = qDiv.dataset.type;
+const qText = qDiv.querySelector('textarea').value;
+const qTitle = qDiv.querySelector('.question-number').textContent.replace(/سؤال \d+:/, `السؤال ${index + 1}:`);
+questionsHTML += `
+<div class="a4-question-container" style="page-break-inside: avoid;">
+<h4 style="color: #007bff; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-top: 0;">${qTitle}</h4>
+<div style="padding: 10px; line-height: 1.5; font-size: 11pt;">
+<pre style="white-space: pre-wrap; margin: 0; font-family: inherit;">${qText}</pre>
+${qType === 'essay' ? '<div style="height: 100px; border: 1px dashed #ccc; margin-top: 10px;"></div>' : ''}
+</div>
+</div>
+`;
+});
+return `
+<div style="max-width: 210mm; margin: 0 auto; padding: 15mm; direction: rtl; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 12pt;">
+${klishehHTML}
+${questionsHTML}
+<div class="pdf-page-break"></div>
+<div style="text-align: center; margin-top: 50px;">
+<p style="font-weight: bold;">تمنياتنا لكم بالتوفيق والنجاح</p>
+<p style="border-top: 1px dashed #777; width: 30%; margin: 30px auto 0 auto;">توقيع المعلم / المعلمة</p>
+</div>
+</div>
+`;
+}
+function saveA4Draft() {
+// ... (تنفيذ حفظ المسودة) ...
+alert('تم حفظ المسودة بنجاح (وظيفة الحفظ لم تنفذ بشكل كامل بعد).');
+}
+function printA4Test() {
+const printContent = generateA4TestHTML();
+const printWindow = window.open('', '_blank');
+printWindow.document.write('<html><head><title>نموذج اختبار A4</title>');
+printWindow.document.write('<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">');
+printWindow.document.write('<style>');
+printWindow.document.write(`
+@page { size: A4; margin: 15mm; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; direction: rtl; font-size: 12pt; margin: 0; padding: 0; }
+.a4-question-container { border: 1px solid #333; padding: 10px; margin-bottom: 10px; page-break-inside: avoid; }
+pre { white-space: pre-wrap; margin: 0; font-family: inherit; }
+`);
+printWindow.document.write('</style></head><body>');
+printWindow.document.write(printContent);
+printWindow.document.write('</body></html>');
+printWindow.document.close();
+printWindow.print();
+}
+function downloadA4Test(format) {
+const htmlContent = generateA4TestHTML();
+if (format === 'pdf') {
+const element = document.createElement('div');
+element.innerHTML = htmlContent;
+const filename = `نموذج_اختبار_A4_${document.getElementById('examSubject').value}.pdf`;
+html2pdf().from(element).set({
+margin: [15, 15, 15, 15], // top, left, bottom, right
+filename: filename,
+image: { type: 'jpeg', quality: 0.98 },
+html2canvas: { scale: 2, logging: true, dpi: 192, letterRendering: true },
+jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+pagebreak: { mode: 'css' }
+}).save();
+} else if (format === 'docx') {
+// يمكن إضافة مكتبة لتحويل HTML إلى DOCX هنا (مثل docxtemplater أو mammoth.js للتصدير)
+alert('⚠️ التنزيل كـ DOCX غير مدعوم حاليًا ويتطلب مكتبات إضافية. يرجى استخدام PDF أو الطباعة.');
+}
+}
+// دوال وهمية للإكمال
+function copyExamLink() {
+alert('تم نسخ الرابط! (وظيفة توليد الرابط غير مفعّلة حالياً).');
+}
+function toggleQRCode() {
+const qrContainer = document.getElementById('qrCodeContainer');
+const linkInput = document.getElementById('examLinkInput');
+if (qrContainer.style.display === 'none') {
+qrContainer.style.display = 'block';
+// إنشاء رمز QR (يجب توليد رابط صالح أولاً)
+const qrCodeEl = document.getElementById('qrcode');
+qrCodeEl.innerHTML = ''; // مسح الرمز القديم
+if (linkInput.value) {
+new QRCode(qrCodeEl, {
+text: linkInput.value,
+width: 128,
+height: 128,
+colorDark: "#000000",
+colorLight: "#ffffff",
+correctLevel: QRCode.CorrectLevel.H
+});
+} else {
+qrCodeEl.innerHTML = '<p style="color: red;">⚠️ لم يتم توليد رابط بعد.</p>';
+}
+} else {
+qrContainer.style.display = 'none';
+}
+}
+</script>
+</body>
+</html>

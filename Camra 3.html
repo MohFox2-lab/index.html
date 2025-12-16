@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>مبدع — كاميرا التصحيح</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;background:#f6f7f9}
+  header{background:#fff;border-bottom:1px solid #e6e6e6;padding:12px}
+  main{max-width:980px;margin:0 auto;padding:12px}
+  .card{background:#fff;border:1px solid #e6e6e6;border-radius:14px;padding:12px;box-shadow:0 1px 8px rgba(0,0,0,.04)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between}
+  button{padding:10px 12px;border-radius:10px;border:1px solid #d7d7d7;background:#fff;font-size:14px}
+  .primary{background:#111;color:#fff;border-color:#111}
+  .danger{background:#b91c1c;color:#fff;border-color:#b91c1c}
+  .hint{font-size:13px;color:#444;margin-top:6px}
+  video,canvas{width:100%;border-radius:12px;border:1px solid #ddd}
+  #debug{max-height:520px}
+  #scanOut{white-space:pre-wrap;font-size:13px;margin-top:8px}
+</style>
+</head>
+<body>
+
+<header><b>مبدع — كاميرا التصحيح</b></header>
+
+<main>
+  <div class="card">
+    <div class="row">
+      <div class="row">
+        <button id="btnStart" class="primary">تشغيل الكاميرا</button>
+        <button id="btnStop" class="danger" disabled>إيقاف</button>
+        <button id="btnScan" disabled>فحص الورقة</button>
+      </div>
+    </div>
+    <div class="hint">📌 تعمل الكاميرا على HTTPS فقط. اسمح بإذن الكاميرا.</div>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <video id="video" autoplay playsinline muted></video>
+  </div>
+
+  <div class="card" style="margin-top:10px">
+    <canvas id="debug"></canvas>
+    <div id="scanOut"></div>
+  </div>
+
+  <canvas id="frame" style="display:none"></canvas>
+</main>
+
+<!-- OpenCV -->
+<script async src="https://docs.opencv.org/4.x/opencv.js"></script>
+
+<script>
+/* ================== Utils ================== */
+const $=id=>document.getElementById(id);
+const video=$("video"), btnStart=$("btnStart"), btnStop=$("btnStop"), btnScan=$("btnScan");
+const frameCanvas=$("frame"), debugCanvas=$("debug"), scanOut=$("scanOut");
+
+function waitCV(){return new Promise(r=>{const t=setInterval(()=>{if(window.cv&&cv.Mat){clearInterval(t);r()}},50)})}
+function dist(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function orderCorners(pts){
+  const sum=pts.map(p=>p.x+p.y), diff=pts.map(p=>p.x-p.y);
+  return [
+    pts[sum.indexOf(Math.min(...sum))], // TL
+    pts[diff.indexOf(Math.min(...diff))], // TR
+    pts[sum.indexOf(Math.max(...sum))], // BR
+    pts[diff.indexOf(Math.max(...diff))], // BL
+  ];
+}
+function quadArea(pts){let a=0;for(let i=0;i<4;i++){const p=pts[i],q=pts[(i+1)%4];a+=p.x*q.y-q.x*p.y}return Math.abs(a)/2}
+
+/* ================== Camera ================== */
+let stream=null;
+btnStart.onclick=async()=>{
+  stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"},audio:false});
+  video.srcObject=stream; btnStop.disabled=false; btnScan.disabled=false; btnStart.disabled=true;
+};
+btnStop.onclick=()=>{
+  if(stream) stream.getTracks().forEach(t=>t.stop());
+  stream=null; btnStop.disabled=true; btnScan.disabled=true; btnStart.disabled=false;
+};
+
+/* ================== Markers ================== */
+function detectSquareMarkers(src){
+  const g=new cv.Mat(); cv.cvtColor(src,g,cv.COLOR_RGBA2GRAY);
+  const b=new cv.Mat(); cv.GaussianBlur(g,b,new cv.Size(5,5),0);
+  const bin=new cv.Mat(); cv.threshold(b,bin,0,255,cv.THRESH_BINARY_INV+cv.THRESH_OTSU);
+  const k=cv.getStructuringElement(cv.MORPH_RECT,new cv.Size(3,3));
+  cv.morphologyEx(bin,bin,cv.MORPH_OPEN,k);
+
+  const cs=new cv.MatVector(), h=new cv.Mat();
+  cv.findContours(bin,cs,h,cv.RETR_EXTERNAL,cv.CHAIN_APPROX_SIMPLE);
+  const out=[], A=src.cols*src.rows;
+
+  for(let i=0;i<cs.size();i++){
+    const c=cs.get(i), area=cv.contourArea(c);
+    if(area<A*0.00003||area>A*0.03){c.delete();continue}
+    const peri=cv.arcLength(c,true), ap=new cv.Mat();
+    cv.approxPolyDP(c,ap,0.02*peri,true);
+    if(ap.rows===4){
+      const r=cv.boundingRect(ap), ar=r.width/r.height;
+      if(ar>.75&&ar<1.25){
+        const hull=new cv.Mat(); cv.convexHull(c,hull,false,true);
+        const sol=area/cv.contourArea(hull); hull.delete();
+        if(sol>.85) out.push({cx:r.x+r.width/2, cy:r.y+r.height/2, rect:r, area});
+      }
+    }
+    ap.delete(); c.delete();
+  }
+  g.delete(); b.delete(); bin.delete(); k.delete(); cs.delete(); h.delete();
+  return out;
+}
+function splitBigSmall(ms){
+  const s=[...ms].sort((a,b)=>b.area-a.area);
+  return {big:s.slice(0,8), small:s.slice(8)};
+}
+function chooseBestFrame(big){
+  if(big.length<3) return null;
+  let best=null,score=-1;
+  for(let a=0;a<big.length;a++)for(let b=a+1;b<big.length;b++)
+  for(let c=b+1;c<big.length;c++)for(let d=c+1;d<big.length;d++){
+    const pts=orderCorners([{x:big[a].cx,y:big[a].cy},{x:big[b].cx,y:big[b].cy},{x:big[c].cx,y:big[c].cy},{x:big[d].cx,y:big[d].cy}]);
+    const A=quadArea(pts);
+    const bal=(Math.min(dist(pts[0],pts[1]),dist(pts[3],pts[2]))/Math.max(dist(pts[0],pts[1]),dist(pts[3],pts[2])))
+             *(Math.min(dist(pts[0],pts[3]),dist(pts[1],pts[2]))/Math.max(dist(pts[0],pts[3]),dist(pts[1],pts[2])));
+    const s=A*bal; if(s>score){score=s; best=pts}
+  }
+  return best;
+}
+function warp(src,pts,w=1200,h=1700){
+  const [tl,tr,br,bl]=pts;
+  const S=cv.matFromArray(4,1,cv.CV_32FC2,[tl.x,tl.y,tr.x,tr.y,br.x,br.y,bl.x,bl.y]);
+  const D=cv.matFromArray(4,1,cv.CV_32FC2,[0,0,w,0,w,h,0,h]);
+  const M=cv.getPerspectiveTransform(S,D), out=new cv.Mat();
+  cv.warpPerspective(src,out,M,new cv.Size(w,h));
+  S.delete(); D.delete(); M.delete(); return out;
+}
+
+/* ================== Bubble Reading ================== */
+function binarize(m){
+  const g=new cv.Mat(); cv.cvtColor(m,g,cv.COLOR_RGBA2GRAY);
+  const b=new cv.Mat(); cv.GaussianBlur(g,b,new cv.Size(5,5),0);
+  const bin=new cv.Mat(); cv.threshold(b,bin,0,255,cv.THRESH_BINARY_INV+cv.THRESH_OTSU);
+  g.delete(); b.delete(); return bin;
+}
+function scoreBubble(bin,x,y,r){
+  const R=Math.max(3,Math.floor(r*.7)); let d=0,t=0;
+  for(let yy=y-R;yy<=y+R;yy++)for(let xx=x-R;xx<=x+R;xx++){
+    if(xx<0||yy<0||xx>=bin.cols||yy>=bin.rows) continue;
+    if((xx-x)**2+(yy-y)**2<=R*R){t++; if(bin.ucharPtr(yy,xx)[0]>0) d++}
+  }
+  return t?d/t:0;
+}
+function detectCircles(g){
+  const c=new cv.Mat();
+  cv.HoughCircles(g,c,cv.HOUGH_GRADIENT,1,22,120,25,8,18);
+  const out=[]; for(let i=0;i<c.cols;i++) out.push({x:c.data32F[i*3],y:c.data32F[i*3+1],r:c.data32F[i*3+2]});
+  c.delete(); return out;
+}
+function group1D(v,g){v=[...v].sort((a,b)=>a-b);const r=[];let c=[v[0]];
+  for(let i=1;i<v.length;i++) Math.abs(v[i]-v[i-1])<=g?c.push(v[i]):(r.push(c),c=[v[i]]);
+  r.push(c); return r.map(a=>a.reduce((x,y)=>x+y,0)/a.length);
+}
+
+/* ================== Scan ================== */
+btnScan.onclick=async()=>{
+  await waitCV();
+  frameCanvas.width=video.videoWidth; frameCanvas.height=video.videoHeight;
+  frameCanvas.getContext("2d").drawImage(video,0,0);
+  const src=cv.imread(frameCanvas);
+
+  const ms=detectSquareMarkers(src), {big}=splitBigSmall(ms);
+  const frame=chooseBestFrame(big);
+  if(!frame){scanOut.textContent="❌ لم أجد الإطار"; src.delete(); return}
+
+  const W=warp(src,frame); src.delete();
+  const bin=binarize(W), dbg=W.clone();
+
+  // منطقة الفقاعات (تقريبية)
+  const y0=Math.floor(W.rows*.46), y1=Math.floor(W.rows*.95);
+  const roi=new cv.Rect(0,y0,W.cols,y1-y0);
+  const R=W.roi(roi), g=new cv.Mat(); cv.cvtColor(R,g,cv.COLOR_RGBA2GRAY);
+  const circles=detectCircles(g); g.delete(); R.delete();
+
+  const xs=group1D(circles.map(c=>c.x),20).slice(0,4);
+  const ys=group1D(circles.map(c=>c.y),22);
+  const MIN_MARK=.06, MIN_DIFF=.02;
+
+  const answers={};
+  ys.forEach((yy,i)=>{
+    const scores=xs.map(xx=>{
+      const c=circles.reduce((p,q)=>dist({x:xx,y:yy},q)<dist({x:xx,y:yy},p)?q:p);
+      const s=scoreBubble(bin,Math.round(c.x),Math.round(c.y+y0),Math.round(c.r));
+      cv.circle(dbg,new cv.Point(c.x,c.y+y0),Math.round(c.r),[0,255,0,255],1);
+      return s;
+    });
+    const m=Math.max(...scores), idx=scores.indexOf(m), sec=[...scores].sort((a,b)=>b-a)[1]||0;
+    answers[i+1]=(m>=MIN_MARK&&(m-sec)>=MIN_DIFF)?["A","B","C","D"][idx]:"";
+  });
+
+  cv.imshow(debugCanvas,dbg); dbg.delete(); bin.delete(); W.delete();
+
+  const key=JSON.parse(localStorage.getItem("MUBDEA_ANSWER_KEY")||"{}");
+  let ok=0,wr=0,em=0;
+  Object.keys(answers).forEach(q=>{
+    if(!answers[q]) em++;
+    else if(key[q]&&answers[q]===key[q]) ok++;
+    else if(key[q]) wr++;
+  });
+  scanOut.textContent=`✅ تم الفحص\nصحيح: ${ok} | خطأ: ${wr} | فارغ/ملتبس: ${em}`;
+};
+</script>
+</body>
+</html>
